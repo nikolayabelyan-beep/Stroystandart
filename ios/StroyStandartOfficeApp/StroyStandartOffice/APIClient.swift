@@ -105,4 +105,16 @@ final class APIClient: ObservableObject {
     func lawUpdateStatus() async throws -> LawUpdateStatusResponse {
         try await executeWithFallback(path: "/law/update-status", timeout: 15, as: LawUpdateStatusResponse.self)
     }
+
+    func servicesStatus() async throws -> ServicesStatusResponse {
+        try await executeWithFallback(path: "/services/status", timeout: 12, as: ServicesStatusResponse.self)
+    }
+
+    func servicesEnsure() async throws -> ServicesStatusResponse {
+        try await executeWithFallback(path: "/services/ensure", method: "POST", timeout: 25, as: ServicesStatusResponse.self)
+    }
+
+    func servicesRestart() async throws -> ServicesStatusResponse {
+        try await executeWithFallback(path: "/services/restart", method: "POST", timeout: 25, as: ServicesStatusResponse.self)
+    }
 }

@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var latestInfo = ""
     @State private var dashboardLink: URL?
     @State private var isUpdatingLaw = false
+    @State private var servicesInfo = ""
 
     var body: some View {
         NavigationView {
@@ -27,6 +28,28 @@ struct ContentView: View {
                         Task {
                             await checkHealth()
                         }
+                    }
+                }
+
+                Section("Сервисы") {
+                    Button("Статус сервисов") {
+                        Task {
+                            await loadServicesStatus()
+                        }
+                    }
+                    Button("Поднять сервисы") {
+                        Task {
+                            await ensureServices()
+                        }
+                    }
+                    Button("Перезапустить сервисы") {
+                        Task {
+                            await restartServices()
+                        }
+                    }
+                    if !servicesInfo.isEmpty {
+                        Text(servicesInfo)
+                            .font(.footnote)
                     }
                 }
 
@@ -76,7 +99,7 @@ struct ContentView: View {
             let response = try await api.health()
             statusText = response.ok ? "API онлайн: \(response.service)" : "API недоступен"
         } catch {
-            statusText = "Нет связи с API. Запустите сервис: scripts/install_mobile_api_launchd.sh"
+            statusText = "Нет связи с API. Нажмите 'Поднять сервисы' в разделе Сервисы."
         }
     }
 
@@ -154,5 +177,44 @@ struct ContentView: View {
         }
         statusText = "Обновление занимает много времени. Проверьте позже через 'Показать последний отчет'."
         isUpdatingLaw = false
+    }
+
+    private func summarizeServices(_ s: ServicesStatusResponse) {
+        let api = s.api_process ? "API: up" : "API: down"
+        let bot = s.bot_process ? "BOT: up" : "BOT: down"
+        let health = s.api_health ? "health: ok" : "health: fail"
+        servicesInfo = "\(api), \(bot), \(health)"
+    }
+
+    private func loadServicesStatus() async {
+        do {
+            let status = try await api.servicesStatus()
+            summarizeServices(status)
+            statusText = "Статус сервисов обновлен"
+        } catch {
+            statusText = "Ошибка статуса сервисов: \(error.localizedDescription)"
+        }
+    }
+
+    private func ensureServices() async {
+        statusText = "Поднимаю сервисы..."
+        do {
+            let status = try await api.servicesEnsure()
+            summarizeServices(status)
+            statusText = status.ok ? "Сервисы запущены/проверены" : "Не удалось поднять сервисы"
+        } catch {
+            statusText = "Ошибка запуска сервисов: \(error.localizedDescription)"
+        }
+    }
+
+    private func restartServices() async {
+        statusText = "Перезапуск сервисов..."
+        do {
+            let status = try await api.servicesRestart()
+            summarizeServices(status)
+            statusText = status.ok ? "Сервисы перезапущены" : "Перезапуск завершился с ошибкой"
+        } catch {
+            statusText = "Ошибка перезапуска сервисов: \(error.localizedDescription)"
+        }
     }
 }

@@ -14,6 +14,8 @@ import json
 import sys
 import re
 import threading
+import subprocess
+import shlex
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -28,6 +30,8 @@ from src.tools.legal_updates_fetcher import run as run_legal_updates
 
 TUNNEL_PATH = BASE_DIR / "data" / "tunnel_url.txt"
 LATEST_LAW_PATH = BASE_DIR / "obsidian_vault" / "01_Law" / "Updates" / "LATEST_UPDATES.md"
+START_SCRIPT = BASE_DIR / "scripts" / "start_services.sh"
+STOP_SCRIPT = BASE_DIR / "scripts" / "stop_services.sh"
 
 UPDATE_STATE = {
     "running": False,
@@ -106,6 +110,76 @@ def parse_latest_law_report() -> dict:
     }
 
 
+def _run_shell(command: str) -> tuple[int, str]:
+    proc = subprocess.run(
+        command,
+        shell=True,
+        cwd=str(BASE_DIR),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=25,
+    )
+    return proc.returncode, (proc.stdout or "").strip()
+
+
+def _pgrep(pattern: str) -> tuple[int, str]:
+    proc = subprocess.run(
+        ["pgrep", "-fal", pattern],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=10,
+    )
+    return proc.returncode, (proc.stdout or "").strip()
+
+
+def services_status() -> dict:
+    api_rc, api_out = _pgrep("mobile_control_server.py --host 0.0.0.0 --port 8787")
+    bot_rc, bot_out = _pgrep("src.bot.telegram_app")
+    api_sup_rc, api_sup_out = _pgrep("run_api_supervisor.sh")
+    bot_sup_rc, bot_sup_out = _pgrep("run_bot_supervisor.sh")
+    health_ok = False
+    try:
+        import urllib.request
+
+        with urllib.request.urlopen("http://127.0.0.1:8787/health", timeout=2) as resp:
+            health_ok = resp.status == 200
+    except Exception:
+        health_ok = False
+
+    return {
+        "api_process": bool(api_out.strip()),
+        "bot_process": bool(bot_out.strip()),
+        "api_supervisor": bool(api_sup_out.strip()),
+        "bot_supervisor": bool(bot_sup_out.strip()),
+        "api_health": health_ok,
+        "api_ps": api_out,
+        "bot_ps": bot_out,
+        "api_supervisor_ps": api_sup_out,
+        "bot_supervisor_ps": bot_sup_out,
+        "api_rc": api_rc,
+        "bot_rc": bot_rc,
+        "api_sup_rc": api_sup_rc,
+        "bot_sup_rc": bot_sup_rc,
+    }
+
+
+def ensure_services() -> dict:
+    if not START_SCRIPT.exists():
+        return {"ok": False, "error": f"missing start script: {START_SCRIPT}"}
+    cmd = shlex.quote(str(START_SCRIPT))
+    rc, out = _run_shell(cmd)
+    payload = {"ok": rc == 0, "rc": rc, "output": out}
+    payload.update(services_status())
+    return payload
+
+
+def restart_services() -> dict:
+    # Safe restart endpoint: ensure services are up without interrupting current API request.
+    return ensure_services()
+
+
 class MobileControlHandler(BaseHTTPRequestHandler):
     server_version = "StroyStandartMobileAPI/1.0"
 
@@ -144,6 +218,12 @@ class MobileControlHandler(BaseHTTPRequestHandler):
             self._write_json(parse_latest_law_report())
             return
 
+        if parsed.path == "/services/status":
+            payload = {"ok": True}
+            payload.update(services_status())
+            self._write_json(payload)
+            return
+
         if parsed.path == "/law/update-status":
             payload = {"ok": True}
             payload.update(snapshot_update_state())
@@ -154,6 +234,14 @@ class MobileControlHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        if parsed.path == "/services/restart":
+            self._write_json(restart_services())
+            return
+
+        if parsed.path == "/services/ensure":
+            self._write_json(ensure_services())
+            return
+
         if parsed.path != "/law/update":
             self._write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
             return

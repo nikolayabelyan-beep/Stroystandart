@@ -39,3 +39,13 @@ struct LawUpdateStatusResponse: Decodable {
     let source_errors: Int?
     let error: String?
 }
+
+struct ServicesStatusResponse: Decodable {
+    let ok: Bool
+    let api_process: Bool
+    let bot_process: Bool
+    let api_health: Bool
+    let api_ps: String
+    let bot_ps: String
+    let output: String?
+}

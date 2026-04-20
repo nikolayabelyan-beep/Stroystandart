@@ -273,11 +273,16 @@ async def get_working_request():
             proxy_type = "Direct" if proxy is None else f"{proxy}"
             
             # Используем AsyncClient для быстрой проверки с коротким таймаутом
-            async with httpx.AsyncClient(proxy=proxy, timeout=3.0, verify=False) as client:
+            async with httpx.AsyncClient(proxy=proxy, timeout=3.0, verify=False, trust_env=False) as client:
                 resp = await client.get(test_url)
                 if resp.status_code == 200:
                     logger.info(f"СВЯЗЬ УСТАНОВЛЕНА: {proxy_type}")
-                    return HTTPXRequest(connect_timeout=30.0, read_timeout=30.0, proxy=proxy)
+                    return HTTPXRequest(
+                        connect_timeout=30.0,
+                        read_timeout=30.0,
+                        proxy=proxy,
+                        httpx_kwargs={"trust_env": False},
+                    )
         except Exception:
             continue
             
