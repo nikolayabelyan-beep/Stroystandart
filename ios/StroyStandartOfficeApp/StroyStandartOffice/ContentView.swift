@@ -8,6 +8,7 @@ struct ContentView: View {
     }
 
     @StateObject private var api = APIClient()
+    @AppStorage("ui_dark_mode") private var useDarkMode = true
     @State private var statusText = "Готово"
     @State private var dashboardURL = ""
     @State private var latestInfo = ""
@@ -31,14 +32,13 @@ struct ContentView: View {
                 VStack(spacing: 14) {
                     healthCard
                     directorCard
-                    actionsCard
-                    legalCard
                     statusCard
                 }
                 .padding(14)
             }
             .scrollDisabled(isChatInteracting)
             .background(backgroundView)
+            .preferredColorScheme(useDarkMode ? .dark : .light)
             .navigationTitle("StroyStandart Office")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -86,16 +86,29 @@ struct ContentView: View {
     }
 
     private var backgroundView: some View {
-        LinearGradient(
-            colors: [Color(red: 0.95, green: 0.97, blue: 1.0), Color(red: 0.98, green: 0.99, blue: 1.0)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        Group {
+            if useDarkMode {
+                LinearGradient(
+                    colors: [Color(red: 0.06, green: 0.09, blue: 0.14), Color(red: 0.10, green: 0.12, blue: 0.18)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else {
+                LinearGradient(
+                    colors: [Color(red: 0.95, green: 0.97, blue: 1.0), Color(red: 0.98, green: 0.99, blue: 1.0)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
         .ignoresSafeArea()
     }
 
     private var settingsMenu: some View {
         Menu {
+            Button(useDarkMode ? "Светлая тема" : "Тёмная тема") {
+                useDarkMode.toggle()
+            }
             Button("Автоисправление") {
                 Task { await autoRecover() }
             }
@@ -112,8 +125,25 @@ struct ContentView: View {
             Button("URL: авто LAN") {
                 Task { await autoRecover() }
             }
-            Button("Обновить юр. источники") {
-                Task { await runLawUpdate() }
+            Menu("Скрытые разделы") {
+                Button("Статус сервисов") {
+                    Task { await loadServicesStatus() }
+                }
+                Button("Поднять сервисы") {
+                    Task { await ensureServices() }
+                }
+                Button("Перезапустить сервисы") {
+                    Task { await restartServices() }
+                }
+                Button("Обновить юр. источники") {
+                    Task { await runLawUpdate() }
+                }
+                Button("Последний юр. отчет") {
+                    Task { await loadLatestLawReport() }
+                }
+                Button("Обновить ссылку дашборда") {
+                    Task { await fetchDashboard() }
+                }
             }
             if let dashboardLink {
                 Link("Открыть дашборд", destination: dashboardLink)
@@ -237,7 +267,7 @@ struct ContentView: View {
                     TextField("Напишите поручение директору", text: $directorInput, axis: .vertical)
                         .lineLimit(2...5)
                         .padding(10)
-                        .background(Color.white)
+                        .background(Color(.secondarySystemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                     HStack(spacing: 8) {
@@ -267,75 +297,8 @@ struct ContentView: View {
                     TextField("Комментарий к загружаемому документу", text: $directorNote)
                         .textInputAutocapitalization(.never)
                         .padding(10)
-                        .background(Color.white)
+                        .background(Color(.secondarySystemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-            }
-        }
-    }
-
-    private var actionsCard: some View {
-        card {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Операции")
-                    .font(.headline)
-
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    actionButton("Автоисправление", "wand.and.stars") { await autoRecover() }
-                    actionButton("Статус сервисов", "waveform.path.ecg") { await loadServicesStatus() }
-                    actionButton("Поднять сервисы", "bolt.fill") { await ensureServices() }
-                    actionButton("Перезапуск", "arrow.clockwise") { await restartServices() }
-                }
-
-                if !servicesInfo.isEmpty {
-                    Text(servicesInfo)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    private var legalCard: some View {
-        card {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Юридический блок")
-                        .font(.headline)
-                    Spacer()
-                    if isUpdatingLaw {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    }
-                }
-
-                HStack(spacing: 8) {
-                    Button("Обновить") {
-                        Task { await runLawUpdate() }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isUpdatingLaw)
-
-                    Button("Последний отчет") {
-                        Task { await loadLatestLawReport() }
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button("Дашборд") {
-                        Task { await fetchDashboard() }
-                    }
-                    .buttonStyle(.bordered)
-                }
-
-                if !latestInfo.isEmpty {
-                    Text(latestInfo)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let dashboardLink {
-                    Link("Открыть дашборд", destination: dashboardLink)
-                        .font(.caption)
                 }
             }
         }
@@ -366,18 +329,6 @@ struct ContentView: View {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(Color.black.opacity(0.05), lineWidth: 1)
             )
-    }
-
-    private func actionButton(_ title: String, _ icon: String, action: @escaping () async -> Void) -> some View {
-        Button {
-            Task { await action() }
-        } label: {
-            Label(title, systemImage: icon)
-                .font(.caption.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-        }
-        .buttonStyle(.bordered)
     }
 
     @ViewBuilder
@@ -600,23 +551,18 @@ struct ContentView: View {
         statusText = "Директор анализирует задачу..."
         do {
             let response = try await api.directorSend(text: text)
-            if let messages = response.messages {
-                directorMessages = messages
-            } else if let reply = response.reply, !reply.isEmpty {
-                directorMessages.append(
-                    DirectorMessage(
-                        id: "local-\(UUID().uuidString)",
-                        role: "assistant",
-                        content: reply,
-                        created_at: nowText()
-                    )
-                )
-            } else {
-                await loadDirectorHistory()
-            }
+            applyDirectorResponse(response)
             statusText = "Ответ директора получен"
         } catch {
-            statusText = "Ошибка чата директора: \(error.localizedDescription)"
+            statusText = "Пробую восстановить связь с директором..."
+            await autoRecover()
+            do {
+                let retry = try await api.directorSend(text: text)
+                applyDirectorResponse(retry)
+                statusText = "Ответ директора получен"
+            } catch {
+                statusText = "Директор временно недоступен: \(error.localizedDescription)"
+            }
         }
         isDirectorBusy = false
     }
@@ -642,26 +588,29 @@ struct ContentView: View {
                 fileData: data,
                 note: directorNote
             )
-            if let messages = response.messages {
-                directorMessages = messages
-            } else if let reply = response.reply, !reply.isEmpty {
-                directorMessages.append(
-                    DirectorMessage(
-                        id: "local-\(UUID().uuidString)",
-                        role: "assistant",
-                        content: reply,
-                        created_at: nowText()
-                    )
-                )
-            } else {
-                await loadDirectorHistory()
-            }
+            applyDirectorResponse(response)
             directorNote = ""
             statusText = "Документ передан директору"
         } catch {
             statusText = "Ошибка загрузки документа: \(error.localizedDescription)"
         }
         isDirectorBusy = false
+    }
+
+    @MainActor
+    private func applyDirectorResponse(_ response: DirectorChatResponse) {
+        if let messages = response.messages {
+            directorMessages = messages
+        } else if let reply = response.reply, !reply.isEmpty {
+            directorMessages.append(
+                DirectorMessage(
+                    id: "local-\(UUID().uuidString)",
+                    role: "assistant",
+                    content: reply,
+                    created_at: nowText()
+                )
+            )
+        }
     }
 
     private func mimeType(for url: URL) -> String {
