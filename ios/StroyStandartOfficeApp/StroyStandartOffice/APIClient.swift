@@ -9,6 +9,7 @@ final class APIClient: ObservableObject {
     }
 
     private let jsonDecoder = JSONDecoder()
+    private let jsonEncoder = JSONEncoder()
     private let knownFallbackBaseURLs = [
         "http://localhost:8787",
         "http://127.0.0.1:8787",
@@ -109,6 +110,67 @@ final class APIClient: ObservableObject {
         }
 
         throw lastError ?? URLError(.cannotConnectToHost)
+    }
+
+    private func executeJSONWithFallback<T: Decodable, B: Encodable>(
+        path: String,
+        body: B,
+        timeout: TimeInterval = 20,
+        as type: T.Type
+    ) async throws -> T {
+        let bodyData = try jsonEncoder.encode(body)
+        var lastError: Error?
+
+        for base in candidateBases() {
+            do {
+                var request = URLRequest(url: try makeURL(path, base: base))
+                request.httpMethod = "POST"
+                request.timeoutInterval = timeout
+                request.httpBody = bodyData
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                let decoded: T = try await execute(request, as: type)
+                if normalizeBase(baseURL) != base {
+                    await MainActor.run {
+                        self.baseURL = base
+                    }
+                }
+                return decoded
+            } catch {
+                lastError = error
+            }
+        }
+
+        if let discoveredBase = await discoverLANBaseURL() {
+            do {
+                var request = URLRequest(url: try makeURL(path, base: discoveredBase))
+                request.httpMethod = "POST"
+                request.timeoutInterval = timeout
+                request.httpBody = bodyData
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                let decoded: T = try await execute(request, as: type)
+                if normalizeBase(baseURL) != discoveredBase {
+                    await MainActor.run {
+                        self.baseURL = discoveredBase
+                    }
+                }
+                return decoded
+            } catch {
+                lastError = error
+            }
+        }
+
+        throw lastError ?? URLError(.cannotConnectToHost)
+    }
+
+    private struct DirectorMessageBody: Encodable {
+        let text: String
+    }
+
+    private struct DirectorUploadBody: Encodable {
+        let filename: String
+        let mime_type: String
+        let content_base64: String
+        let note: String
     }
 
     private static func normalizeStaticBase(_ raw: String) -> String {
@@ -296,5 +358,32 @@ final class APIClient: ObservableObject {
 
     func servicesRestart() async throws -> ServicesStatusResponse {
         try await executeWithFallback(path: "/services/restart", method: "POST", timeout: 25, as: ServicesStatusResponse.self)
+    }
+
+    func directorHistory() async throws -> DirectorHistoryResponse {
+        try await executeWithFallback(path: "/director/history", timeout: 20, as: DirectorHistoryResponse.self)
+    }
+
+    func directorSend(text: String) async throws -> DirectorChatResponse {
+        try await executeJSONWithFallback(
+            path: "/director/message",
+            body: DirectorMessageBody(text: text),
+            timeout: 30,
+            as: DirectorChatResponse.self
+        )
+    }
+
+    func directorUpload(filename: String, mimeType: String, fileData: Data, note: String) async throws -> DirectorChatResponse {
+        try await executeJSONWithFallback(
+            path: "/director/upload",
+            body: DirectorUploadBody(
+                filename: filename,
+                mime_type: mimeType,
+                content_base64: fileData.base64EncodedString(),
+                note: note
+            ),
+            timeout: 60,
+            as: DirectorChatResponse.self
+        )
     }
 }

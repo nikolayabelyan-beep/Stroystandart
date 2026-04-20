@@ -49,3 +49,23 @@ struct ServicesStatusResponse: Decodable {
     let bot_ps: String
     let output: String?
 }
+
+struct DirectorMessage: Decodable, Identifiable {
+    let id: String
+    let role: String
+    let content: String
+    let created_at: String?
+}
+
+struct DirectorHistoryResponse: Decodable {
+    let ok: Bool
+    let messages: [DirectorMessage]
+}
+
+struct DirectorChatResponse: Decodable {
+    let ok: Bool
+    let reply: String?
+    let saved_path: String?
+    let messages: [DirectorMessage]?
+    let error: String?
+}

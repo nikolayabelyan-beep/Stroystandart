@@ -27,3 +27,5 @@ Notes:
 - iPhone and Mac must be in the same Wi-Fi network.
 - Manual URL field is still available as fallback.
 - launchd autostart runs from `~/StroyStandartRuntime`; after repo updates rerun `scripts/install_services_launchd.sh`.
+- Director control:
+  - Section `Директор (AI)` supports chat tasks and document upload from Files app (`pdf/docx/xlsx/txt` etc.).

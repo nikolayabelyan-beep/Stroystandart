@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     private enum SystemHealthState {
@@ -16,6 +17,11 @@ struct ContentView: View {
     @State private var isAutoRecovering = false
     @State private var healthState: SystemHealthState = .bad
     @State private var lastHealthCheckText = "—"
+    @State private var directorMessages: [DirectorMessage] = []
+    @State private var directorInput = ""
+    @State private var directorNote = ""
+    @State private var isDirectorBusy = false
+    @State private var isFileImporterPresented = false
 
     var body: some View {
         NavigationView {
@@ -40,6 +46,55 @@ struct ContentView: View {
                     }
                     Text("Последняя проверка: \(lastHealthCheckText)")
                         .font(.footnote)
+                }
+
+                Section("Директор (AI)") {
+                    if directorMessages.isEmpty {
+                        Text("Диалог пока пуст. Отправьте задачу директору.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 8) {
+                                ForEach(directorMessages.suffix(8)) { message in
+                                    HStack {
+                                        if message.role == "assistant" {
+                                            directorBubble(
+                                                text: message.content,
+                                                isAssistant: true
+                                            )
+                                            Spacer(minLength: 20)
+                                        } else {
+                                            Spacer(minLength: 20)
+                                            directorBubble(
+                                                text: message.content,
+                                                isAssistant: false
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .frame(minHeight: 120, maxHeight: 260)
+                    }
+
+                    TextField("Поручение директору", text: $directorInput, axis: .vertical)
+                        .lineLimit(2...5)
+                        .textInputAutocapitalization(.never)
+                    Button("Отправить директору") {
+                        Task {
+                            await sendDirectorMessage()
+                        }
+                    }
+                    .disabled(isDirectorBusy || directorInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    TextField("Комментарий к документу (опц.)", text: $directorNote)
+                        .textInputAutocapitalization(.never)
+                    Button("Загрузить документ директору") {
+                        isFileImporterPresented = true
+                    }
+                    .disabled(isDirectorBusy)
                 }
 
                 Section("Подключение") {
@@ -128,7 +183,23 @@ struct ContentView: View {
             .task {
                 await checkHealth()
                 await loadServicesStatus()
+                await loadDirectorHistory()
                 await startHealthAutoRefresh()
+            }
+            .fileImporter(
+                isPresented: $isFileImporterPresented,
+                allowedContentTypes: [.pdf, .plainText, .rtf, .spreadsheet, .item],
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    guard let url = urls.first else { return }
+                    Task {
+                        await uploadDirectorDocument(from: url)
+                    }
+                case .failure(let error):
+                    statusText = "Ошибка выбора файла: \(error.localizedDescription)"
+                }
             }
         }
     }
@@ -298,5 +369,89 @@ struct ContentView: View {
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "dd.MM.yyyy HH:mm:ss"
         return formatter.string(from: Date())
+    }
+
+    private func loadDirectorHistory() async {
+        do {
+            let response = try await api.directorHistory()
+            directorMessages = response.messages
+        } catch {
+            statusText = "Ошибка загрузки диалога директора: \(error.localizedDescription)"
+        }
+    }
+
+    private func sendDirectorMessage() async {
+        let text = directorInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+
+        isDirectorBusy = true
+        statusText = "Директор анализирует задачу..."
+        do {
+            let response = try await api.directorSend(text: text)
+            if let messages = response.messages {
+                directorMessages = messages
+            } else {
+                await loadDirectorHistory()
+            }
+            directorInput = ""
+            statusText = "Ответ директора получен"
+        } catch {
+            statusText = "Ошибка чата директора: \(error.localizedDescription)"
+        }
+        isDirectorBusy = false
+    }
+
+    private func uploadDirectorDocument(from url: URL) async {
+        isDirectorBusy = true
+        statusText = "Загружаю документ директору..."
+        let hasScope = url.startAccessingSecurityScopedResource()
+        defer {
+            if hasScope {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let data = try Data(contentsOf: url)
+            let name = url.lastPathComponent
+            let mime = mimeType(for: url)
+            let response = try await api.directorUpload(
+                filename: name,
+                mimeType: mime,
+                fileData: data,
+                note: directorNote
+            )
+            if let messages = response.messages {
+                directorMessages = messages
+            } else {
+                await loadDirectorHistory()
+            }
+            directorNote = ""
+            statusText = "Документ передан директору"
+        } catch {
+            statusText = "Ошибка загрузки документа: \(error.localizedDescription)"
+        }
+        isDirectorBusy = false
+    }
+
+    private func mimeType(for url: URL) -> String {
+        if let type = UTType(filenameExtension: url.pathExtension),
+           let mime = type.preferredMIMEType {
+            return mime
+        }
+        return "application/octet-stream"
+    }
+
+    @ViewBuilder
+    private func directorBubble(text: String, isAssistant: Bool) -> some View {
+        Text(text)
+            .font(.system(.footnote, design: .rounded))
+            .foregroundStyle(isAssistant ? Color.primary : Color.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(isAssistant ? Color(.secondarySystemBackground) : Color.blue)
+            )
     }
 }

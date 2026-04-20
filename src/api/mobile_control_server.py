@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import sys
 import re
+import base64
 import threading
 import subprocess
 import shlex
@@ -27,11 +28,16 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 from src.tools.legal_updates_fetcher import run as run_legal_updates
+from src.bot.history import add_message, get_history
+from src.crew.construction_firm import run_crew
 
 TUNNEL_PATH = BASE_DIR / "data" / "tunnel_url.txt"
 LATEST_LAW_PATH = BASE_DIR / "obsidian_vault" / "01_Law" / "Updates" / "LATEST_UPDATES.md"
 START_SCRIPT = BASE_DIR / "scripts" / "start_services.sh"
 STOP_SCRIPT = BASE_DIR / "scripts" / "stop_services.sh"
+DIRECTOR_UPLOADS_DIR = BASE_DIR / "data" / "director_uploads"
+DIRECTOR_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+DIRECTOR_CHAT_ID = 990001
 
 UPDATE_STATE = {
     "running": False,
@@ -47,6 +53,94 @@ UPDATE_LOCK = threading.Lock()
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _safe_filename(name: str) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9._-]+", "_", (name or "").strip())
+    cleaned = cleaned.strip("._")
+    return cleaned or "upload.bin"
+
+
+def _director_messages_payload() -> list[dict]:
+    history = get_history(DIRECTOR_CHAT_ID)
+    out: list[dict] = []
+    for i, item in enumerate(history[-80:]):
+        role = str(item.get("role", "assistant"))
+        content = str(item.get("content", ""))
+        created_at = item.get("created_at")
+        out.append(
+            {
+                "id": f"m{i+1}",
+                "role": role,
+                "content": content,
+                "created_at": created_at if isinstance(created_at, str) else None,
+            }
+        )
+    return out
+
+
+def _read_json_body(handler: BaseHTTPRequestHandler) -> dict:
+    length = int(handler.headers.get("Content-Length", "0") or "0")
+    if length <= 0:
+        return {}
+    raw = handler.rfile.read(length)
+    if not raw:
+        return {}
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+        return payload if isinstance(payload, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def director_handle_message(text: str) -> dict:
+    text = (text or "").strip()
+    if not text:
+        return {"ok": False, "error": "empty_message"}
+    add_message(DIRECTOR_CHAT_ID, "user", text)
+    history = get_history(DIRECTOR_CHAT_ID)
+    reply = run_crew(text, "Исполнительный Директор", history)
+    add_message(DIRECTOR_CHAT_ID, "assistant", reply)
+    return {"ok": True, "reply": reply, "messages": _director_messages_payload()}
+
+
+def director_handle_upload(filename: str, mime_type: str, content_base64: str, note: str) -> dict:
+    if not content_base64:
+        return {"ok": False, "error": "empty_file"}
+
+    try:
+        binary = base64.b64decode(content_base64.encode("utf-8"), validate=True)
+    except Exception:
+        return {"ok": False, "error": "invalid_base64"}
+
+    if len(binary) > 12 * 1024 * 1024:
+        return {"ok": False, "error": "file_too_large"}
+
+    safe_name = _safe_filename(filename)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    save_path = DIRECTOR_UPLOADS_DIR / f"{stamp}_{safe_name}"
+    save_path.write_bytes(binary)
+
+    note_clean = (note or "").strip()
+    user_prompt = (
+        "Пользователь загрузил документ для директора.\n"
+        f"Файл: {save_path}\n"
+        f"MIME: {(mime_type or 'application/octet-stream').strip()}\n"
+        f"Комментарий: {note_clean if note_clean else 'без комментария'}\n"
+        "Сформируй директорское решение, риски, и следующий шаг по протоколу."
+    )
+
+    add_message(DIRECTOR_CHAT_ID, "user", user_prompt)
+    history = get_history(DIRECTOR_CHAT_ID)
+    reply = run_crew(user_prompt, "Исполнительный Директор", history)
+    add_message(DIRECTOR_CHAT_ID, "assistant", reply)
+
+    return {
+        "ok": True,
+        "saved_path": str(save_path),
+        "reply": reply,
+        "messages": _director_messages_payload(),
+    }
 
 
 def _update_worker(timeout: int) -> None:
@@ -230,10 +324,38 @@ class MobileControlHandler(BaseHTTPRequestHandler):
             self._write_json(payload)
             return
 
+        if parsed.path == "/director/history":
+            self._write_json({"ok": True, "messages": _director_messages_payload()})
+            return
+
         self._write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        if parsed.path == "/director/message":
+            payload = _read_json_body(self)
+            text = str(payload.get("text", ""))
+            result = director_handle_message(text)
+            if not result.get("ok"):
+                self._write_json(result, HTTPStatus.BAD_REQUEST)
+                return
+            self._write_json(result)
+            return
+
+        if parsed.path == "/director/upload":
+            payload = _read_json_body(self)
+            result = director_handle_upload(
+                filename=str(payload.get("filename", "")),
+                mime_type=str(payload.get("mime_type", "")),
+                content_base64=str(payload.get("content_base64", "")),
+                note=str(payload.get("note", "")),
+            )
+            if not result.get("ok"):
+                self._write_json(result, HTTPStatus.BAD_REQUEST)
+                return
+            self._write_json(result)
+            return
+
         if parsed.path == "/services/restart":
             self._write_json(restart_services())
             return
