@@ -233,6 +233,7 @@ def services_status() -> dict:
     bot_rc, bot_out = _pgrep("src.bot.telegram_app")
     api_sup_rc, api_sup_out = _pgrep("run_api_supervisor.sh")
     bot_sup_rc, bot_sup_out = _pgrep("run_bot_supervisor.sh")
+    watchdog_rc, watchdog_out = _pgrep("run_service_watchdog.sh")
     health_ok = False
     try:
         import urllib.request
@@ -247,15 +248,18 @@ def services_status() -> dict:
         "bot_process": bool(bot_out.strip()),
         "api_supervisor": bool(api_sup_out.strip()),
         "bot_supervisor": bool(bot_sup_out.strip()),
+        "watchdog_process": bool(watchdog_out.strip()),
         "api_health": health_ok,
         "api_ps": api_out,
         "bot_ps": bot_out,
         "api_supervisor_ps": api_sup_out,
         "bot_supervisor_ps": bot_sup_out,
+        "watchdog_ps": watchdog_out,
         "api_rc": api_rc,
         "bot_rc": bot_rc,
         "api_sup_rc": api_sup_rc,
         "bot_sup_rc": bot_sup_rc,
+        "watchdog_rc": watchdog_rc,
     }
 
 

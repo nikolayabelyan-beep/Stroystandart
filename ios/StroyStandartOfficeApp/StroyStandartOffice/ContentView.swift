@@ -30,7 +30,6 @@ struct ContentView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 14) {
-                    healthCard
                     directorCard
                     statusCard
                 }
