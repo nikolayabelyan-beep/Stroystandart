@@ -22,6 +22,7 @@ struct ContentView: View {
     @State private var directorNote = ""
     @State private var isDirectorBusy = false
     @State private var isFileImporterPresented = false
+    @State private var showLastCheckToast = false
 
     var body: some View {
         NavigationView {
@@ -43,6 +44,19 @@ struct ContentView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     statusDot
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if showLastCheckToast {
+                    Text("Последняя проверка: \(lastHealthCheckText)")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                        .padding(.top, 6)
+                        .padding(.trailing, 14)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
             .task {
@@ -114,16 +128,30 @@ struct ContentView: View {
             .fill(healthState == .good ? Color.green : Color.red)
             .frame(width: 11, height: 11)
             .overlay(Circle().stroke(Color.white.opacity(0.7), lineWidth: 1))
+            .contentShape(Rectangle())
+            .padding(.vertical, 6)
+            .onLongPressGesture(minimumDuration: 5) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showLastCheckToast = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showLastCheckToast = false
+                    }
+                }
+            }
     }
 
     private var healthCard: some View {
         card {
             HStack(spacing: 10) {
-                statusDot
+                Image(systemName: "building.2.crop.circle")
+                    .font(.title3)
+                    .foregroundStyle(.indigo)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(healthState == .good ? "Система в норме" : "Требуется внимание")
+                    Text("Командный центр")
                         .font(.headline)
-                    Text("Последняя проверка: \(lastHealthCheckText)")
+                    Text("Статус смотри по кружку справа вверху")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
