@@ -20,6 +20,8 @@ venv/
 *.log
 data/history/
 data/mobile_api/*.log
+data/runtime/*
+!data/runtime/.gitkeep
 bot_debug.log
 
 # Generated artifacts
