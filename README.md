@@ -17,6 +17,15 @@ Automation stack for office workflows in a construction company:
 4. Run Telegram bot:
    - `python3 -m src.bot.telegram_app`
 
+## Autostart on Mac Boot
+- Install launchd autostart (API + bot):
+  - `./scripts/install_services_launchd.sh`
+- Remove launchd autostart:
+  - `./scripts/uninstall_services_launchd.sh`
+- Note:
+  - Autostart runs from runtime copy: `~/StroyStandartRuntime` (required for macOS permissions).
+  - After any code updates in this repo, run `./scripts/install_services_launchd.sh` again to sync runtime copy.
+
 ## iPhone control
 - iOS app source: `ios/StroyStandartOfficeApp/`
 - API URL in app: `http://<YOUR_MAC_IP>:8787`

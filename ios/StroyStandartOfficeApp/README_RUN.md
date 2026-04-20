@@ -6,9 +6,9 @@ cd /Users/nikolajtamrazov/Documents/BACKUP_GOLD
 ./scripts/start_services.sh
 ```
 
-2. Optional: install launchd for persistent API on reboot:
+2. Optional: install launchd for persistent API + bot on reboot:
 ```bash
-/Users/nikolajtamrazov/Documents/BACKUP_GOLD/scripts/install_mobile_api_launchd.sh
+/Users/nikolajtamrazov/Documents/BACKUP_GOLD/scripts/install_services_launchd.sh
 ```
 
 3. Verify API:
@@ -26,3 +26,4 @@ Notes:
 - In app, use button `Автоисправление (1 кнопка)` to auto-find Mac API in LAN and ensure services are running.
 - iPhone and Mac must be in the same Wi-Fi network.
 - Manual URL field is still available as fallback.
+- launchd autostart runs from `~/StroyStandartRuntime`; after repo updates rerun `scripts/install_services_launchd.sh`.
