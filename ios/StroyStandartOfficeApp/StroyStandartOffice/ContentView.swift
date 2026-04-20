@@ -160,23 +160,34 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 8)
                 } else {
-                    ScrollView {
-                        VStack(spacing: 8) {
-                            ForEach(directorMessages.suffix(10)) { message in
-                                HStack {
-                                    if message.role == "assistant" {
-                                        directorBubble(message: message, isAssistant: true)
-                                        Spacer(minLength: 16)
-                                    } else {
-                                        Spacer(minLength: 16)
-                                        directorBubble(message: message, isAssistant: false)
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(spacing: 8) {
+                                ForEach(directorMessages) { message in
+                                    HStack {
+                                        if message.role == "assistant" {
+                                            directorBubble(message: message, isAssistant: true)
+                                            Spacer(minLength: 16)
+                                        } else {
+                                            Spacer(minLength: 16)
+                                            directorBubble(message: message, isAssistant: false)
+                                        }
                                     }
                                 }
+                                Color.clear
+                                    .frame(height: 1)
+                                    .id("director-chat-bottom")
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .frame(minHeight: 180, maxHeight: 420)
+                        .scrollIndicators(.visible)
+                        .onChange(of: directorMessages.count) { _ in
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                proxy.scrollTo("director-chat-bottom", anchor: .bottom)
                             }
                         }
-                        .padding(.vertical, 4)
                     }
-                    .frame(minHeight: 120, maxHeight: 280)
                 }
 
                 VStack(spacing: 8) {
@@ -518,6 +529,7 @@ struct ContentView: View {
         return formatter.string(from: Date())
     }
 
+    @MainActor
     private func loadDirectorHistory() async {
         do {
             let response = try await api.directorHistory()
@@ -527,9 +539,19 @@ struct ContentView: View {
         }
     }
 
+    @MainActor
     private func sendDirectorMessage() async {
         let text = directorInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+
+        let localUserMessage = DirectorMessage(
+            id: "local-\(UUID().uuidString)",
+            role: "user",
+            content: text,
+            created_at: nowText()
+        )
+        directorMessages.append(localUserMessage)
+        directorInput = ""
 
         isDirectorBusy = true
         statusText = "Директор анализирует задачу..."
@@ -537,10 +559,18 @@ struct ContentView: View {
             let response = try await api.directorSend(text: text)
             if let messages = response.messages {
                 directorMessages = messages
+            } else if let reply = response.reply, !reply.isEmpty {
+                directorMessages.append(
+                    DirectorMessage(
+                        id: "local-\(UUID().uuidString)",
+                        role: "assistant",
+                        content: reply,
+                        created_at: nowText()
+                    )
+                )
             } else {
                 await loadDirectorHistory()
             }
-            directorInput = ""
             statusText = "Ответ директора получен"
         } catch {
             statusText = "Ошибка чата директора: \(error.localizedDescription)"
@@ -548,6 +578,7 @@ struct ContentView: View {
         isDirectorBusy = false
     }
 
+    @MainActor
     private func uploadDirectorDocument(from url: URL) async {
         isDirectorBusy = true
         statusText = "Загружаю документ директору..."
@@ -570,6 +601,15 @@ struct ContentView: View {
             )
             if let messages = response.messages {
                 directorMessages = messages
+            } else if let reply = response.reply, !reply.isEmpty {
+                directorMessages.append(
+                    DirectorMessage(
+                        id: "local-\(UUID().uuidString)",
+                        role: "assistant",
+                        content: reply,
+                        created_at: nowText()
+                    )
+                )
             } else {
                 await loadDirectorHistory()
             }
