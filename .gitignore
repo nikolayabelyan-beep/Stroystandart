@@ -1,0 +1,35 @@
+# Secrets and local env
+.env
+.env.*
+!.env.example
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Runtime logs/state
+*.log
+data/history/
+data/mobile_api/*.log
+bot_debug.log
+
+# Generated artifacts
+output/
+
+# Local dependencies
+node_modules/
+
+# Xcode derived data
+DerivedData/
+*.xcuserstate
+
+node_modules

@@ -1,0 +1,37 @@
+[
+  {
+    "id": "government_ru_news",
+    "name": "Правительство РФ - новости",
+    "url": "https://government.ru/news/",
+    "kind": "html",
+    "tags": ["правительство", "нормативные изменения"]
+  },
+  {
+    "id": "government_ru_docs",
+    "name": "Правительство РФ - документы",
+    "url": "https://government.ru/docs/all/",
+    "kind": "html",
+    "tags": ["правительство", "постановления", "распоряжения"]
+  },
+  {
+    "id": "pravo_gov_ru",
+    "name": "Официальный интернет-портал правовой информации",
+    "url": "https://pravo.gov.ru/",
+    "kind": "html",
+    "tags": ["официальное опубликование", "нпа"]
+  },
+  {
+    "id": "vsrf_ru",
+    "name": "Верховный Суд РФ",
+    "url": "https://vsrf.ru/",
+    "kind": "html",
+    "tags": ["судебная практика", "верховный суд"]
+  },
+  {
+    "id": "sozd_duma",
+    "name": "СОЗД ГД РФ",
+    "url": "https://sozd.duma.gov.ru/",
+    "kind": "html",
+    "tags": ["законопроекты", "госдума"]
+  }
+]

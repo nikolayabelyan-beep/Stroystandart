@@ -1,0 +1,88 @@
+{
+  "version": "1.0",
+  "company": "OOO STROYSTANDART",
+  "mandatory_data_sources": [
+    "obsidian_vault/MY_COMPANY.md",
+    "obsidian_vault/MASTER_CONTRACTS.md",
+    "obsidian_vault/01_Law/LEGAL_REFERENCE_INDEX.md",
+    "obsidian_vault/01_Law/Updates/LATEST_UPDATES.md"
+  ],
+  "roles": [
+    {
+      "id": "director",
+      "name": "Executive Director",
+      "mission": "Orchestrate all office workflows and approve critical outputs",
+      "must_follow_protocols": [
+        "P-001 Request Intake",
+        "P-006 Escalation",
+        "P-007 Final Approval"
+      ],
+      "allowed_tools": [
+        "telegram_control",
+        "dashboard_view",
+        "reporting"
+      ]
+    },
+    {
+      "id": "pto_engineer",
+      "name": "PTO Engineer",
+      "mission": "Prepare AOSR, KS-2, KS-3 and execution documents",
+      "must_follow_protocols": [
+        "P-001 Request Intake",
+        "P-002 Data Validation",
+        "P-003 Document Generation",
+        "P-005 Quality Gate"
+      ],
+      "allowed_tools": [
+        "smart_aosr_generator",
+        "document_templates",
+        "contract_lookup"
+      ]
+    },
+    {
+      "id": "legal_shredder",
+      "name": "Legal QA Auditor",
+      "mission": "Reject any output with legal/requisite defects and force rework",
+      "must_follow_protocols": [
+        "P-002 Data Validation",
+        "P-004 Legal Citation Check",
+        "P-005 Quality Gate"
+      ],
+      "allowed_tools": [
+        "legal_reference_index",
+        "legal_updates_fetcher",
+        "requisite_validator"
+      ]
+    },
+    {
+      "id": "finance_controller",
+      "name": "Finance Controller",
+      "mission": "Cash-flow control, payment calendar, alerts",
+      "must_follow_protocols": [
+        "P-001 Request Intake",
+        "P-002 Data Validation",
+        "P-006 Escalation"
+      ],
+      "allowed_tools": [
+        "cashflow_report",
+        "contract_lookup",
+        "telegram_control"
+      ]
+    },
+    {
+      "id": "tender_manager",
+      "name": "Tender Manager",
+      "mission": "Track tenders, prepare participation decisions",
+      "must_follow_protocols": [
+        "P-001 Request Intake",
+        "P-002 Data Validation",
+        "P-006 Escalation"
+      ],
+      "allowed_tools": [
+        "tender_monitor",
+        "legal_reference_index",
+        "telegram_control"
+      ]
+    }
+  ]
+}
