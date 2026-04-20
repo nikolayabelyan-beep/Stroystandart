@@ -1,6 +1,11 @@
 import SwiftUI
 
 struct ContentView: View {
+    private enum SystemHealthState {
+        case good
+        case bad
+    }
+
     @StateObject private var api = APIClient()
     @State private var statusText = "Готово"
     @State private var dashboardURL = ""
@@ -9,10 +14,34 @@ struct ContentView: View {
     @State private var isUpdatingLaw = false
     @State private var servicesInfo = ""
     @State private var isAutoRecovering = false
+    @State private var healthState: SystemHealthState = .bad
+    @State private var lastHealthCheckText = "—"
 
     var body: some View {
         NavigationView {
             Form {
+                Section("Состояние системы") {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 10) {
+                            Circle()
+                                .fill(healthState == .good ? Color.green : Color.red)
+                                .frame(width: 84, height: 84)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                                )
+
+                            Text(healthState == .good ? "ЗЕЛЕНЫЙ" : "КРАСНЫЙ")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                        }
+                        Spacer()
+                    }
+                    Text("Последняя проверка: \(lastHealthCheckText)")
+                        .font(.footnote)
+                }
+
                 Section("Подключение") {
                     TextField("API URL", text: $api.baseURL)
                         .textInputAutocapitalization(.never)
@@ -97,6 +126,8 @@ struct ContentView: View {
             .navigationTitle("StroyStandart Office")
             .task {
                 await checkHealth()
+                await loadServicesStatus()
+                await startHealthAutoRefresh()
             }
         }
     }
@@ -105,9 +136,14 @@ struct ContentView: View {
         do {
             let response = try await api.health()
             statusText = response.ok ? "API онлайн: \(response.service)" : "API недоступен"
+            if response.ok {
+                healthState = .good
+            }
         } catch {
             statusText = "Нет связи с API. Нажмите 'Поднять сервисы' в разделе Сервисы."
+            healthState = .bad
         }
+        lastHealthCheckText = nowText()
     }
 
     private func fetchDashboard() async {
@@ -191,6 +227,8 @@ struct ContentView: View {
         let bot = s.bot_process ? "BOT: up" : "BOT: down"
         let health = s.api_health ? "health: ok" : "health: fail"
         servicesInfo = "\(api), \(bot), \(health)"
+        healthState = (s.api_process && s.bot_process && s.api_health) ? .good : .bad
+        lastHealthCheckText = nowText()
     }
 
     private func loadServicesStatus() async {
@@ -200,6 +238,8 @@ struct ContentView: View {
             statusText = "Статус сервисов обновлен"
         } catch {
             statusText = "Ошибка статуса сервисов: \(error.localizedDescription)"
+            healthState = .bad
+            lastHealthCheckText = nowText()
         }
     }
 
@@ -240,5 +280,22 @@ struct ContentView: View {
             statusText = "Автовосстановление не удалось: \(error.localizedDescription)"
         }
         isAutoRecovering = false
+    }
+
+    private func startHealthAutoRefresh() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            if Task.isCancelled {
+                return
+            }
+            await loadServicesStatus()
+        }
+    }
+
+    private func nowText() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "dd.MM.yyyy HH:mm:ss"
+        return formatter.string(from: Date())
     }
 }
