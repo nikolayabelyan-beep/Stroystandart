@@ -8,6 +8,7 @@ struct ContentView: View {
     @State private var dashboardLink: URL?
     @State private var isUpdatingLaw = false
     @State private var servicesInfo = ""
+    @State private var isAutoRecovering = false
 
     var body: some View {
         NavigationView {
@@ -16,6 +17,12 @@ struct ContentView: View {
                     TextField("API URL", text: $api.baseURL)
                         .textInputAutocapitalization(.never)
                         .disableAutocorrection(true)
+                    Button("Автоисправление (1 кнопка)") {
+                        Task {
+                            await autoRecover()
+                        }
+                    }
+                    .disabled(isAutoRecovering)
                     Button("Сбросить URL на Mac (LAN)") {
                         api.baseURL = "http://192.168.0.107:8787"
                         statusText = "URL сброшен на API вашего Mac"
@@ -216,5 +223,22 @@ struct ContentView: View {
         } catch {
             statusText = "Ошибка перезапуска сервисов: \(error.localizedDescription)"
         }
+    }
+
+    private func autoRecover() async {
+        isAutoRecovering = true
+        statusText = "Автоподключение и восстановление сервисов..."
+        do {
+            let result = try await api.autoConnectAndEnsureServices()
+            summarizeServices(result.status)
+            if result.discoveredOnLAN {
+                statusText = "Готово: API найден в LAN (\(result.baseURL)), сервисы проверены"
+            } else {
+                statusText = "Готово: подключение к \(result.baseURL), сервисы проверены"
+            }
+        } catch {
+            statusText = "Автовосстановление не удалось: \(error.localizedDescription)"
+        }
+        isAutoRecovering = false
     }
 }
