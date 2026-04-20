@@ -2,7 +2,7 @@ import Foundation
 import Darwin
 
 final class APIClient: ObservableObject {
-    @Published var baseURL: String = UserDefaults.standard.string(forKey: "api_base_url") ?? "http://192.168.0.107:8787" {
+    @Published var baseURL: String = UserDefaults.standard.string(forKey: "api_base_url") ?? "http://127.0.0.1:8787" {
         didSet {
             UserDefaults.standard.set(baseURL, forKey: "api_base_url")
         }
@@ -10,7 +10,6 @@ final class APIClient: ObservableObject {
 
     private let jsonDecoder = JSONDecoder()
     private let knownFallbackBaseURLs = [
-        "http://192.168.0.107:8787",
         "http://localhost:8787",
         "http://127.0.0.1:8787",
     ]
@@ -90,6 +89,25 @@ final class APIClient: ObservableObject {
                 lastError = error
             }
         }
+
+        // If simple fallbacks failed, try active LAN discovery once.
+        if let discoveredBase = await discoverLANBaseURL() {
+            do {
+                var request = URLRequest(url: try makeURL(path, base: discoveredBase))
+                request.httpMethod = method
+                request.timeoutInterval = timeout
+                let decoded: T = try await execute(request, as: type)
+                if normalizeBase(baseURL) != discoveredBase {
+                    await MainActor.run {
+                        self.baseURL = discoveredBase
+                    }
+                }
+                return decoded
+            } catch {
+                lastError = error
+            }
+        }
+
         throw lastError ?? URLError(.cannotConnectToHost)
     }
 

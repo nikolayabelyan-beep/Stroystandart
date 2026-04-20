@@ -34,7 +34,23 @@ fi
 sleep 2
 python3 - <<'PY'
 import urllib.request
-for u in ("http://127.0.0.1:8787/health", "http://192.168.0.107:8787/health"):
+import subprocess
+
+lan_ip = ""
+for cmd in (["ipconfig", "getifaddr", "en0"], ["ipconfig", "getifaddr", "en1"]):
+    try:
+        out = subprocess.check_output(cmd, text=True).strip()
+        if out:
+            lan_ip = out
+            break
+    except Exception:
+        pass
+
+urls = ["http://127.0.0.1:8787/health"]
+if lan_ip:
+    urls.append(f"http://{lan_ip}:8787/health")
+
+for u in urls:
     try:
         print(u, urllib.request.urlopen(u, timeout=4).status)
     except Exception as e:

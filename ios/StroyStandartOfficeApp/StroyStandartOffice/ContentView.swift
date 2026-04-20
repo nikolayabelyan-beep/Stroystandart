@@ -52,9 +52,10 @@ struct ContentView: View {
                         }
                     }
                     .disabled(isAutoRecovering)
-                    Button("Сбросить URL на Mac (LAN)") {
-                        api.baseURL = "http://192.168.0.107:8787"
-                        statusText = "URL сброшен на API вашего Mac"
+                    Button("Сбросить URL на авто (LAN)") {
+                        Task {
+                            await autoRecover()
+                        }
                     }
                     Button("Сбросить URL на localhost") {
                         api.baseURL = "http://127.0.0.1:8787"
