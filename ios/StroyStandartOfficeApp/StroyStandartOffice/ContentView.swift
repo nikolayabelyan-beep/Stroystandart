@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var isDirectorBusy = false
     @State private var isFileImporterPresented = false
     @State private var showLastCheckToast = false
+    @State private var isChatInteracting = false
 
     var body: some View {
         NavigationView {
@@ -36,6 +37,7 @@ struct ContentView: View {
                 }
                 .padding(14)
             }
+            .scrollDisabled(isChatInteracting)
             .background(backgroundView)
             .navigationTitle("StroyStandart Office")
             .toolbar {
@@ -189,7 +191,7 @@ struct ContentView: View {
                         .padding(.vertical, 8)
                 } else {
                     ScrollViewReader { proxy in
-                        ScrollView {
+                        ScrollView(.vertical, showsIndicators: true) {
                             LazyVStack(spacing: 8) {
                                 ForEach(directorMessages) { message in
                                     HStack {
@@ -210,6 +212,19 @@ struct ContentView: View {
                         }
                         .frame(minHeight: 180, maxHeight: 420)
                         .scrollIndicators(.visible)
+                        .highPriorityGesture(
+                            DragGesture(minimumDistance: 3)
+                                .onChanged { _ in
+                                    if !isChatInteracting {
+                                        isChatInteracting = true
+                                    }
+                                }
+                                .onEnded { _ in
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                        isChatInteracting = false
+                                    }
+                                }
+                        )
                         .onChange(of: directorMessages.count) { _ in
                             withAnimation(.easeOut(duration: 0.2)) {
                                 proxy.scrollTo("director-chat-bottom", anchor: .bottom)
