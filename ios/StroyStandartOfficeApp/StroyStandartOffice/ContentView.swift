@@ -25,161 +25,26 @@ struct ContentView: View {
 
     var body: some View {
         NavigationView {
-            Form {
-                Section("Состояние системы") {
-                    HStack {
-                        Spacer()
-                        VStack(spacing: 10) {
-                            Circle()
-                                .fill(healthState == .good ? Color.green : Color.red)
-                                .frame(width: 84, height: 84)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-                                )
-
-                            Text(healthState == .good ? "ЗЕЛЕНЫЙ" : "КРАСНЫЙ")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                        }
-                        Spacer()
-                    }
-                    Text("Последняя проверка: \(lastHealthCheckText)")
-                        .font(.footnote)
+            ScrollView {
+                VStack(spacing: 14) {
+                    healthCard
+                    directorCard
+                    actionsCard
+                    legalCard
+                    statusCard
                 }
-
-                Section("Директор (AI)") {
-                    if directorMessages.isEmpty {
-                        Text("Диалог пока пуст. Отправьте задачу директору.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ScrollView {
-                            VStack(spacing: 8) {
-                                ForEach(directorMessages.suffix(8)) { message in
-                                    HStack {
-                                        if message.role == "assistant" {
-                                            directorBubble(
-                                                text: message.content,
-                                                isAssistant: true
-                                            )
-                                            Spacer(minLength: 20)
-                                        } else {
-                                            Spacer(minLength: 20)
-                                            directorBubble(
-                                                text: message.content,
-                                                isAssistant: false
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                        .frame(minHeight: 120, maxHeight: 260)
-                    }
-
-                    TextField("Поручение директору", text: $directorInput, axis: .vertical)
-                        .lineLimit(2...5)
-                        .textInputAutocapitalization(.never)
-                    Button("Отправить директору") {
-                        Task {
-                            await sendDirectorMessage()
-                        }
-                    }
-                    .disabled(isDirectorBusy || directorInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                    TextField("Комментарий к документу (опц.)", text: $directorNote)
-                        .textInputAutocapitalization(.never)
-                    Button("Загрузить документ директору") {
-                        isFileImporterPresented = true
-                    }
-                    .disabled(isDirectorBusy)
+                .padding(14)
+            }
+            .background(backgroundView)
+            .navigationTitle("StroyStandart Office")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    settingsMenu
                 }
-
-                Section("Подключение") {
-                    TextField("API URL", text: $api.baseURL)
-                        .textInputAutocapitalization(.never)
-                        .disableAutocorrection(true)
-                    Button("Автоисправление (1 кнопка)") {
-                        Task {
-                            await autoRecover()
-                        }
-                    }
-                    .disabled(isAutoRecovering)
-                    Button("Сбросить URL на авто (LAN)") {
-                        Task {
-                            await autoRecover()
-                        }
-                    }
-                    Button("Сбросить URL на localhost") {
-                        api.baseURL = "http://127.0.0.1:8787"
-                        statusText = "URL сброшен на localhost"
-                    }
-                    Button("Проверить соединение") {
-                        Task {
-                            await checkHealth()
-                        }
-                    }
-                }
-
-                Section("Сервисы") {
-                    Button("Статус сервисов") {
-                        Task {
-                            await loadServicesStatus()
-                        }
-                    }
-                    Button("Поднять сервисы") {
-                        Task {
-                            await ensureServices()
-                        }
-                    }
-                    Button("Перезапустить сервисы") {
-                        Task {
-                            await restartServices()
-                        }
-                    }
-                    if !servicesInfo.isEmpty {
-                        Text(servicesInfo)
-                            .font(.footnote)
-                    }
-                }
-
-                Section("Юридическая база") {
-                    Button("Обновить нормативные источники") {
-                        Task {
-                            await runLawUpdate()
-                        }
-                    }
-                    .disabled(isUpdatingLaw)
-                    Button("Показать последний отчет") {
-                        Task {
-                            await loadLatestLawReport()
-                        }
-                    }
-                    if !latestInfo.isEmpty {
-                        Text(latestInfo)
-                            .font(.footnote)
-                    }
-                }
-
-                Section("Дашборд") {
-                    Button("Получить ссылку дашборда") {
-                        Task {
-                            await fetchDashboard()
-                        }
-                    }
-                    if let dashboardLink {
-                        Link("Открыть дашборд", destination: dashboardLink)
-                    }
-                }
-
-                Section("Статус") {
-                    Text(statusText)
-                        .font(.footnote)
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    statusDot
                 }
             }
-            .navigationTitle("StroyStandart Office")
             .task {
                 await checkHealth()
                 await loadServicesStatus()
@@ -204,15 +69,301 @@ struct ContentView: View {
         }
     }
 
+    private var backgroundView: some View {
+        LinearGradient(
+            colors: [Color(red: 0.95, green: 0.97, blue: 1.0), Color(red: 0.98, green: 0.99, blue: 1.0)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+
+    private var settingsMenu: some View {
+        Menu {
+            Button("Автоисправление") {
+                Task { await autoRecover() }
+            }
+            Button("Проверить соединение") {
+                Task {
+                    await checkHealth()
+                    await loadServicesStatus()
+                }
+            }
+            Button("URL: localhost") {
+                api.baseURL = "http://127.0.0.1:8787"
+                statusText = "URL переключен на localhost"
+            }
+            Button("URL: авто LAN") {
+                Task { await autoRecover() }
+            }
+            Button("Обновить юр. источники") {
+                Task { await runLawUpdate() }
+            }
+            if let dashboardLink {
+                Link("Открыть дашборд", destination: dashboardLink)
+            }
+        } label: {
+            Label("Настройки", systemImage: "slider.horizontal.3")
+                .labelStyle(.iconOnly)
+                .font(.title3)
+        }
+    }
+
+    private var statusDot: some View {
+        Circle()
+            .fill(healthState == .good ? Color.green : Color.red)
+            .frame(width: 11, height: 11)
+            .overlay(Circle().stroke(Color.white.opacity(0.7), lineWidth: 1))
+    }
+
+    private var healthCard: some View {
+        card {
+            HStack(spacing: 10) {
+                statusDot
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(healthState == .good ? "Система в норме" : "Требуется внимание")
+                        .font(.headline)
+                    Text("Последняя проверка: \(lastHealthCheckText)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+        }
+    }
+
+    private var directorCard: some View {
+        card {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(LinearGradient(colors: [Color.black, Color.blue], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: 34, height: 34)
+                        .overlay(Text("ЭК").font(.caption2).fontWeight(.bold).foregroundStyle(.white))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Эмилио Ковальский")
+                            .font(.headline)
+                        Text("Исполнительный директор AI")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if isDirectorBusy {
+                        ProgressView()
+                            .scaleEffect(0.85)
+                    }
+                }
+
+                if directorMessages.isEmpty {
+                    Text("Диалог пуст. Дайте задачу директору или загрузите документ.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 8)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            ForEach(directorMessages.suffix(10)) { message in
+                                HStack {
+                                    if message.role == "assistant" {
+                                        directorBubble(message: message, isAssistant: true)
+                                        Spacer(minLength: 16)
+                                    } else {
+                                        Spacer(minLength: 16)
+                                        directorBubble(message: message, isAssistant: false)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .frame(minHeight: 120, maxHeight: 280)
+                }
+
+                VStack(spacing: 8) {
+                    TextField("Напишите поручение директору", text: $directorInput, axis: .vertical)
+                        .lineLimit(2...5)
+                        .padding(10)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                    HStack(spacing: 8) {
+                        Button {
+                            Task { await sendDirectorMessage() }
+                        } label: {
+                            Label("Отправить", systemImage: "paperplane.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isDirectorBusy || directorInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                        Button {
+                            isFileImporterPresented = true
+                        } label: {
+                            Label("Файл", systemImage: "paperclip")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(isDirectorBusy)
+                    }
+
+                    TextField("Комментарий к загружаемому документу", text: $directorNote)
+                        .textInputAutocapitalization(.never)
+                        .padding(10)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+            }
+        }
+    }
+
+    private var actionsCard: some View {
+        card {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Операции")
+                    .font(.headline)
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    actionButton("Автоисправление", "wand.and.stars") { await autoRecover() }
+                    actionButton("Статус сервисов", "waveform.path.ecg") { await loadServicesStatus() }
+                    actionButton("Поднять сервисы", "bolt.fill") { await ensureServices() }
+                    actionButton("Перезапуск", "arrow.clockwise") { await restartServices() }
+                }
+
+                if !servicesInfo.isEmpty {
+                    Text(servicesInfo)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var legalCard: some View {
+        card {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Юридический блок")
+                        .font(.headline)
+                    Spacer()
+                    if isUpdatingLaw {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Button("Обновить") {
+                        Task { await runLawUpdate() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isUpdatingLaw)
+
+                    Button("Последний отчет") {
+                        Task { await loadLatestLawReport() }
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button("Дашборд") {
+                        Task { await fetchDashboard() }
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                if !latestInfo.isEmpty {
+                    Text(latestInfo)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let dashboardLink {
+                    Link("Открыть дашборд", destination: dashboardLink)
+                        .font(.caption)
+                }
+            }
+        }
+    }
+
+    private var statusCard: some View {
+        card {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Статус")
+                    .font(.headline)
+                Text(statusText)
+                    .font(.footnote)
+                Text("API: \(api.baseURL)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+        }
+    }
+
+    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .padding(12)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
+            )
+    }
+
+    private func actionButton(_ title: String, _ icon: String, action: @escaping () async -> Void) -> some View {
+        Button {
+            Task { await action() }
+        } label: {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+        }
+        .buttonStyle(.bordered)
+    }
+
+    @ViewBuilder
+    private func directorBubble(message: DirectorMessage, isAssistant: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(message.content)
+                .font(.system(.footnote, design: .rounded))
+                .foregroundStyle(isAssistant ? Color.primary : Color.white)
+            if let createdAt = message.created_at, !createdAt.isEmpty {
+                Text(createdAt.replacingOccurrences(of: "T", with: " "))
+                    .font(.caption2)
+                    .foregroundStyle(isAssistant ? Color.secondary : Color.white.opacity(0.75))
+            }
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.blue, Color.indigo],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .opacity(isAssistant ? 0 : 1)
+                )
+        )
+    }
+
     private func checkHealth() async {
         do {
             let response = try await api.health()
             statusText = response.ok ? "API онлайн: \(response.service)" : "API недоступен"
-            if response.ok {
-                healthState = .good
-            }
+            healthState = response.ok ? .good : .bad
         } catch {
-            statusText = "Нет связи с API. Нажмите 'Поднять сервисы' в разделе Сервисы."
+            statusText = "Нет связи с API. Нажмите Автоисправление."
             healthState = .bad
         }
         lastHealthCheckText = nowText()
@@ -223,11 +374,7 @@ struct ContentView: View {
             let response = try await api.dashboard()
             dashboardURL = response.dashboard_url
             dashboardLink = URL(string: dashboardURL.trimmingCharacters(in: .whitespacesAndNewlines))
-            if dashboardLink == nil {
-                statusText = "Dashboard пока недоступен (tunnel_url.txt пуст)."
-            } else {
-                statusText = "Ссылка дашборда загружена"
-            }
+            statusText = dashboardLink == nil ? "Dashboard пока недоступен" : "Ссылка дашборда загружена"
         } catch {
             statusText = "Ошибка: \(error.localizedDescription)"
         }
@@ -245,11 +392,11 @@ struct ContentView: View {
 
     private func runLawUpdate() async {
         isUpdatingLaw = true
-        statusText = "Обновление запущено в фоне..."
+        statusText = "Обновление запущено..."
         do {
             let response = try await api.lawUpdate()
             if response.ok, response.running == true {
-                statusText = "Идет обновление... проверяю статус"
+                statusText = "Идет обновление..."
                 await pollLawUpdateStatus()
             } else if response.ok {
                 let newCount = response.new_publications ?? 0
@@ -290,7 +437,7 @@ struct ContentView: View {
                 return
             }
         }
-        statusText = "Обновление занимает много времени. Проверьте позже через 'Показать последний отчет'."
+        statusText = "Обновление занимает много времени. Проверьте позже."
         isUpdatingLaw = false
     }
 
@@ -339,14 +486,14 @@ struct ContentView: View {
 
     private func autoRecover() async {
         isAutoRecovering = true
-        statusText = "Автоподключение и восстановление сервисов..."
+        statusText = "Автоподключение и восстановление..."
         do {
             let result = try await api.autoConnectAndEnsureServices()
             summarizeServices(result.status)
             if result.discoveredOnLAN {
-                statusText = "Готово: API найден в LAN (\(result.baseURL)), сервисы проверены"
+                statusText = "Готово: API найден в LAN (\(result.baseURL))"
             } else {
-                statusText = "Готово: подключение к \(result.baseURL), сервисы проверены"
+                statusText = "Готово: подключение к \(result.baseURL)"
             }
         } catch {
             statusText = "Автовосстановление не удалось: \(error.localizedDescription)"
@@ -440,18 +587,5 @@ struct ContentView: View {
             return mime
         }
         return "application/octet-stream"
-    }
-
-    @ViewBuilder
-    private func directorBubble(text: String, isAssistant: Bool) -> some View {
-        Text(text)
-            .font(.system(.footnote, design: .rounded))
-            .foregroundStyle(isAssistant ? Color.primary : Color.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isAssistant ? Color(.secondarySystemBackground) : Color.blue)
-            )
     }
 }
