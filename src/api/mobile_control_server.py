@@ -79,6 +79,43 @@ def _director_messages_payload() -> list[dict]:
     return out
 
 
+def _extract_execution_payload(reply: str) -> dict | None:
+    text = (reply or "").strip()
+    if not text:
+        return None
+
+    payload: dict[str, str | bool] = {}
+
+    role_match = re.search(r"^Роль:\s*(.+)$", text, flags=re.MULTILINE)
+    result_match = re.search(r"^Результат:\s*(.+)$", text, flags=re.MULTILINE)
+    executor_match = re.search(r"^- Исполнитель:\s*(.+)$", text, flags=re.MULTILINE)
+    status_match = re.search(r"^- Статус:\s*(.+)$", text, flags=re.MULTILINE)
+    next_step_match = re.search(r"^- Следующий шаг:\s*(.+)$", text, flags=re.MULTILINE)
+    resolution_match = re.search(r"^- Резолюция:\s*(.+)$", text, flags=re.MULTILINE)
+    rework_match = re.search(r"Результат возвращен на доработку исполнителю:\s*(.+)", text)
+
+    if role_match:
+        payload["worker_role"] = role_match.group(1).strip()
+    if result_match:
+        payload["result_summary"] = result_match.group(1).strip()
+    if executor_match:
+        payload["executor"] = executor_match.group(1).strip()
+    if status_match:
+        payload["status"] = status_match.group(1).strip()
+    if next_step_match:
+        payload["next_step"] = next_step_match.group(1).strip()
+    if resolution_match:
+        payload["resolution"] = resolution_match.group(1).strip()
+    if rework_match:
+        payload["executor"] = rework_match.group(1).strip()
+        payload["status"] = "возвращено на доработку"
+        payload["needs_revision"] = True
+
+    if not payload:
+        return None
+    return payload
+
+
 def _read_json_body(handler: BaseHTTPRequestHandler) -> dict:
     length = int(handler.headers.get("Content-Length", "0") or "0")
     if length <= 0:
@@ -101,7 +138,12 @@ def director_handle_message(text: str) -> dict:
     history = get_history(DIRECTOR_CHAT_ID)
     reply = run_crew(text, "Исполнительный Директор", history)
     add_message(DIRECTOR_CHAT_ID, "assistant", reply)
-    return {"ok": True, "reply": reply, "messages": _director_messages_payload()}
+    return {
+        "ok": True,
+        "reply": reply,
+        "messages": _director_messages_payload(),
+        "execution": _extract_execution_payload(reply),
+    }
 
 
 def director_handle_upload(filename: str, mime_type: str, content_base64: str, note: str) -> dict:
@@ -140,6 +182,7 @@ def director_handle_upload(filename: str, mime_type: str, content_base64: str, n
         "saved_path": str(save_path),
         "reply": reply,
         "messages": _director_messages_payload(),
+        "execution": _extract_execution_payload(reply),
     }
 
 

@@ -62,10 +62,21 @@ struct DirectorHistoryResponse: Decodable {
     let messages: [DirectorMessage]
 }
 
+struct DirectorExecution: Decodable {
+    let worker_role: String?
+    let result_summary: String?
+    let executor: String?
+    let status: String?
+    let next_step: String?
+    let resolution: String?
+    let needs_revision: Bool?
+}
+
 struct DirectorChatResponse: Decodable {
     let ok: Bool
     let reply: String?
     let saved_path: String?
     let messages: [DirectorMessage]?
+    let execution: DirectorExecution?
     let error: String?
 }
