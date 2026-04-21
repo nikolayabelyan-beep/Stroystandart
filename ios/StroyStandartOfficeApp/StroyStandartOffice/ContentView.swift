@@ -146,6 +146,11 @@ struct ContentView: View {
         var id: String { rawValue }
     }
 
+    private struct ExecutorHistoryTarget: Identifiable {
+        let id: String
+        let name: String
+    }
+
     @StateObject private var api = APIClient()
     @AppStorage("ui_dark_mode") private var useDarkMode = true
     @AppStorage("director_tasks_json") private var directorTasksJSON = "[]"
@@ -171,6 +176,7 @@ struct ContentView: View {
     @State private var directorTasks: [DirectorTask] = []
     @State private var selectedTaskID: String?
     @State private var selectedTaskRoleFilter: TaskRoleFilter = .all
+    @State private var selectedExecutorHistory: ExecutorHistoryTarget?
     @FocusState private var isDirectorInputFocused: Bool
     @FocusState private var isDirectorNoteFocused: Bool
 
@@ -185,6 +191,7 @@ struct ContentView: View {
                         directorSummaryCard
                         directorAlertsCard
                         executionControlCard
+                        executorHistoryCard
                         directorTaskBoardCard
                         executionInboxCard
                         statusCard
@@ -194,6 +201,7 @@ struct ContentView: View {
                         directorTaskBoardCard
                     case .documents:
                         documentCard
+                        documentWorkflowCard
                         directorTaskBoardCard
                         statusCard
                     }
@@ -252,6 +260,9 @@ struct ContentView: View {
             }
             .sheet(item: selectedTaskBinding) { task in
                 directorTaskDetailSheet(task: task)
+            }
+            .sheet(item: $selectedExecutorHistory) { executor in
+                executorHistorySheet(executor: executor.name)
             }
         }
     }
@@ -629,10 +640,10 @@ struct ContentView: View {
                 }
 
                 HStack(spacing: 8) {
-                    roleLoadCapsule(title: "Юрист", value: "\(taskCount(for: "Юрист"))", tint: .indigo)
-                    roleLoadCapsule(title: "ПТО", value: "\(taskCount(for: "ПТО"))", tint: .teal)
-                    roleLoadCapsule(title: "Финансы", value: "\(taskCount(for: "Финансы"))", tint: .orange)
-                    roleLoadCapsule(title: "Директор", value: "\(taskCount(for: "Директор"))", tint: .blue)
+                    roleLoadCapsule(title: "Юрист", value: "\(taskCount(for: "Юрист"))", tint: .indigo, executor: "Юрист")
+                    roleLoadCapsule(title: "ПТО", value: "\(taskCount(for: "ПТО"))", tint: .teal, executor: "ПТО")
+                    roleLoadCapsule(title: "Финансы", value: "\(taskCount(for: "Финансы"))", tint: .orange, executor: "Финансы")
+                    roleLoadCapsule(title: "Директор", value: "\(taskCount(for: "Директор"))", tint: .blue, executor: "Директор")
                 }
 
                 if let latest = executionSnapshots.first {
@@ -655,6 +666,58 @@ struct ContentView: View {
                     }
                 } else {
                     taskPlaceholder("После ответа директора здесь появится карточка исполнителя с результатом и следующим шагом.")
+                }
+            }
+        }
+    }
+
+    private var executorHistoryCard: some View {
+        card {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("История исполнителей")
+                            .font(.headline)
+                        Text("Последние принятые и возвращенные результаты по ролям")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+
+                if topExecutors.isEmpty {
+                    taskPlaceholder("Когда подчиненные начнут закрывать задачи, здесь появится их история.")
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(topExecutors, id: \.self) { executor in
+                            Button {
+                                selectedExecutorHistory = ExecutorHistoryTarget(id: executor, name: executor)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Circle()
+                                        .fill(executorTint(executor).opacity(0.18))
+                                        .frame(width: 30, height: 30)
+                                        .overlay(Image(systemName: "person.text.rectangle.fill").foregroundStyle(executorTint(executor)))
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(executor)
+                                            .font(.footnote.weight(.semibold))
+                                        Text(executorHistorySubtitle(executor))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(2)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(10)
+                                .background(Color(.secondarySystemBackground).opacity(useDarkMode ? 0.35 : 0.8))
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
             }
         }
@@ -799,6 +862,59 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(isDirectorBusy)
+            }
+        }
+    }
+
+    private var documentWorkflowCard: some View {
+        card {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Документный контур")
+                            .font(.headline)
+                        Text("Текущие документы в работе у директора")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    taskMetaChip(text: "\(documentTasks.count)", tint: .blue)
+                }
+
+                if documentTasks.isEmpty {
+                    taskPlaceholder("После загрузки файла здесь появится его рабочий путь и статус.")
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(documentTasks.prefix(4)) { task in
+                            Button {
+                                selectedTaskID = task.id
+                            } label: {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text(task.title.replacingOccurrences(of: "Проверить документ: ", with: ""))
+                                            .font(.footnote.weight(.semibold))
+                                        Spacer()
+                                        taskMetaChip(text: task.stage.rawValue, tint: task.stage.color)
+                                    }
+                                    Text(documentStatusText(for: task))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                    if let lastEvent = task.timeline.last {
+                                        Text("Последнее событие: \(lastEvent.title)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(10)
+                                .background(Color(.secondarySystemBackground).opacity(useDarkMode ? 0.35 : 0.8))
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
             }
         }
     }
@@ -992,6 +1108,91 @@ struct ContentView: View {
         }
     }
 
+    private func executorHistorySheet(executor: String) -> some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 14) {
+                    card {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Circle()
+                                    .fill(executorTint(executor).opacity(0.18))
+                                    .frame(width: 38, height: 38)
+                                    .overlay(Image(systemName: "person.text.rectangle.fill").foregroundStyle(executorTint(executor)))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(executor)
+                                        .font(.headline)
+                                    Text("История выполнения и директорских решений")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                            }
+                            Text(executorHistorySubtitle(executor))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    card {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Последние задачи")
+                                .font(.headline)
+
+                            if executorTasks(executor).isEmpty {
+                                taskPlaceholder("У этого исполнителя пока нет задач в истории.")
+                            } else {
+                                VStack(spacing: 10) {
+                                    ForEach(executorTasks(executor).prefix(8)) { task in
+                                        Button {
+                                            selectedExecutorHistory = nil
+                                            selectedTaskID = task.id
+                                        } label: {
+                                            VStack(alignment: .leading, spacing: 8) {
+                                                HStack {
+                                                    Text(task.title)
+                                                        .font(.footnote.weight(.semibold))
+                                                    Spacer()
+                                                    taskMetaChip(text: task.isCompleted ? "Исполнено" : task.stage.rawValue, tint: task.isCompleted ? .green : task.stage.color)
+                                                }
+                                                Text(task.detail)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(2)
+                                                if let last = task.timeline.last {
+                                                    Text("\(last.createdAt) • \(last.title)")
+                                                        .font(.caption2)
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                            }
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(10)
+                                            .background(Color(.secondarySystemBackground).opacity(useDarkMode ? 0.35 : 0.8))
+                                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(14)
+            }
+            .background(backgroundView)
+            .preferredColorScheme(useDarkMode ? .dark : .light)
+            .navigationTitle(executor)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Закрыть") {
+                        selectedExecutorHistory = nil
+                    }
+                }
+            }
+        }
+    }
+
     private var directorWorkspaceHeader: some View {
         HStack(spacing: 12) {
             Circle()
@@ -1178,19 +1379,24 @@ struct ContentView: View {
         .buttonStyle(.plain)
     }
 
-    private func roleLoadCapsule(title: String, value: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(tint)
+    private func roleLoadCapsule(title: String, value: String, tint: Color, executor: String) -> some View {
+        Button {
+            selectedExecutorHistory = ExecutorHistoryTarget(id: executor, name: executor)
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(tint)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(tint.opacity(0.10))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(tint.opacity(0.10))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .buttonStyle(.plain)
     }
 
     private var taskRoleFilterStrip: some View {
@@ -1757,11 +1963,15 @@ struct ContentView: View {
     }
 
     private var activeDirectorTasks: [DirectorTask] {
-        directorTasks.filter { !$0.isCompleted }.reversed()
+        directorTasks
+            .filter { !$0.isCompleted }
+            .sorted(by: taskPriorityOrder)
     }
 
     private var completedDirectorTasks: [DirectorTask] {
-        directorTasks.filter { $0.isCompleted }.reversed()
+        directorTasks
+            .filter { $0.isCompleted }
+            .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
     }
 
     private var alertTasks: [DirectorTask] {
@@ -1778,6 +1988,21 @@ struct ContentView: View {
 
     private var filteredCompletedDirectorTasks: [DirectorTask] {
         completedDirectorTasks.filter(matchesSelectedRoleFilter)
+    }
+
+    private var documentTasks: [DirectorTask] {
+        directorTasks
+            .filter { $0.title.hasPrefix("Проверить документ:") }
+            .sorted(by: taskPriorityOrder)
+    }
+
+    private var topExecutors: [String] {
+        var ordered: [String] = []
+        for task in directorTasks.sorted(by: taskPriorityOrder) {
+            guard !task.assignee.isEmpty, !ordered.contains(task.assignee) else { continue }
+            ordered.append(task.assignee)
+        }
+        return Array(ordered.prefix(4))
     }
 
     private var selectedTaskBinding: Binding<DirectorTask?> {
@@ -1970,6 +2195,80 @@ struct ContentView: View {
 
     private func taskCount(for assignee: String) -> Int {
         activeDirectorTasks.filter { $0.assignee == assignee }.count
+    }
+
+    private func executorTasks(_ executor: String) -> [DirectorTask] {
+        directorTasks.filter { $0.assignee == executor }.sorted(by: taskPriorityOrder)
+    }
+
+    private func executorHistorySubtitle(_ executor: String) -> String {
+        let tasks = executorTasks(executor)
+        if tasks.isEmpty {
+            return "Задач пока нет."
+        }
+        let completed = tasks.filter(\.isCompleted).count
+        let revisions = tasks.filter { latestRevisionText(for: $0) != nil }.count
+        return "Всего задач: \(tasks.count), исполнено: \(completed), доработок: \(revisions)"
+    }
+
+    private func executorTint(_ executor: String) -> Color {
+        switch executor {
+        case "Юрист":
+            return .indigo
+        case "ПТО":
+            return .teal
+        case "Финансы":
+            return .orange
+        case "Снабжение":
+            return .mint
+        default:
+            return .blue
+        }
+    }
+
+    private func documentStatusText(for task: DirectorTask) -> String {
+        if task.unreadAlerts > 0 {
+            return "Есть новые замечания директора. Требуется доработка."
+        }
+        if task.isCompleted {
+            return "Документ согласован и закрыт."
+        }
+        if let last = task.timeline.last {
+            return last.detail.isEmpty ? last.title : last.detail
+        }
+        return task.detail.isEmpty ? "Документ ожидает обработки." : task.detail
+    }
+
+    private func taskPriorityOrder(_ lhs: DirectorTask, _ rhs: DirectorTask) -> Bool {
+        let lhsScore = taskSortScore(lhs)
+        let rhsScore = taskSortScore(rhs)
+        if lhsScore != rhsScore {
+            return lhsScore > rhsScore
+        }
+        return lhs.createdAt > rhs.createdAt
+    }
+
+    private func taskSortScore(_ task: DirectorTask) -> Int {
+        var score = 0
+        score += task.unreadAlerts * 100
+        if isTaskOverdue(task) { score += 80 }
+        switch task.priority {
+        case .high:
+            score += 40
+        case .medium:
+            score += 20
+        case .low:
+            score += 10
+        }
+        switch task.stage {
+        case .inProgress:
+            score += 15
+        case .new:
+            score += 10
+        case .control:
+            score += 5
+        }
+        return score
     }
 
     private func executionSnapshot(from message: DirectorMessage) -> ExecutionSnapshot? {
