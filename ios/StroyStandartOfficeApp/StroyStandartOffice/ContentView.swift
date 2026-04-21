@@ -77,6 +77,18 @@ struct ContentView: View {
         let resolution: String
         let needsRevision: Bool
         let createdAt: String?
+        let revisionComments: String
+    }
+
+    private enum TaskRoleFilter: String, CaseIterable, Identifiable {
+        case all = "Все"
+        case director = "Директор"
+        case legal = "Юрист"
+        case pto = "ПТО"
+        case finance = "Финансы"
+        case supply = "Снабжение"
+
+        var id: String { rawValue }
     }
 
     @StateObject private var api = APIClient()
@@ -103,6 +115,7 @@ struct ContentView: View {
     @State private var lastUploadedFileName = ""
     @State private var directorTasks: [DirectorTask] = []
     @State private var selectedTaskID: String?
+    @State private var selectedTaskRoleFilter: TaskRoleFilter = .all
     @FocusState private var isDirectorInputFocused: Bool
     @FocusState private var isDirectorNoteFocused: Bool
 
@@ -430,7 +443,9 @@ struct ContentView: View {
                     Text("Текущие задачи директора")
                         .font(.subheadline.weight(.semibold))
 
-                    if activeDirectorTasks.isEmpty {
+                    taskRoleFilterStrip
+
+                    if filteredActiveDirectorTasks.isEmpty {
                         taskPlaceholder("Активных задач пока нет. Отправь директору поручение, и оно появится здесь автоматически.")
                     } else {
                         if !overdueDirectorTasks.isEmpty {
@@ -446,7 +461,7 @@ struct ContentView: View {
                             .background(Color.red.opacity(0.08))
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
-                        ForEach(activeDirectorTasks) { task in
+                        ForEach(filteredActiveDirectorTasks) { task in
                             directorTaskRow(task: task, completed: false)
                         }
                     }
@@ -458,10 +473,10 @@ struct ContentView: View {
                     Text("Исполненные задачи")
                         .font(.subheadline.weight(.semibold))
 
-                    if completedDirectorTasks.isEmpty {
+                    if filteredCompletedDirectorTasks.isEmpty {
                         taskPlaceholder("Закрытые задачи будут собираться здесь.")
                     } else {
-                        ForEach(completedDirectorTasks.prefix(5)) { task in
+                        ForEach(filteredCompletedDirectorTasks.prefix(5)) { task in
                             directorTaskRow(task: task, completed: true)
                         }
                     }
@@ -508,6 +523,9 @@ struct ContentView: View {
                             }
                         }
                         executionHighlightCard(latest)
+                        if latest.needsRevision, !latest.revisionComments.isEmpty {
+                            revisionFeedbackCard(latest)
+                        }
                     }
                 } else {
                     taskPlaceholder("После ответа директора здесь появится карточка исполнителя с результатом и следующим шагом.")
@@ -1012,6 +1030,30 @@ struct ContentView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
+    private var taskRoleFilterStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(TaskRoleFilter.allCases) { filter in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            selectedTaskRoleFilter = filter
+                        }
+                    } label: {
+                        Text(filter.rawValue)
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(selectedTaskRoleFilter == filter ? Color.accentColor.opacity(0.18) : Color(.secondarySystemBackground).opacity(useDarkMode ? 0.45 : 0.95))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
     private func taskPlaceholder(_ text: String) -> some View {
         Text(text)
             .font(.footnote)
@@ -1141,9 +1183,33 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if !snapshot.resolution.isEmpty {
+                Text("Резолюция: \(snapshot.resolution)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(10)
         .background(Color(.secondarySystemBackground).opacity(useDarkMode ? 0.35 : 0.8))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func revisionFeedbackCard(_ snapshot: ExecutionSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.bubble.fill")
+                    .foregroundStyle(.orange)
+                Text("Замечания директора")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
+            }
+            Text(snapshot.revisionComments)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(10)
+        .background(Color.orange.opacity(0.10))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
@@ -1507,6 +1573,14 @@ struct ContentView: View {
         directorTasks.filter { $0.isCompleted }.reversed()
     }
 
+    private var filteredActiveDirectorTasks: [DirectorTask] {
+        activeDirectorTasks.filter(matchesSelectedRoleFilter)
+    }
+
+    private var filteredCompletedDirectorTasks: [DirectorTask] {
+        completedDirectorTasks.filter(matchesSelectedRoleFilter)
+    }
+
     private var selectedTaskBinding: Binding<DirectorTask?> {
         Binding(
             get: {
@@ -1675,6 +1749,7 @@ struct ContentView: View {
         let nextStep = firstMatch(in: text, pattern: #"(?m)^- Следующий шаг:\s*(.+)$"#) ?? ""
         let resolution = firstMatch(in: text, pattern: #"(?m)^- Резолюция:\s*(.+)$"#) ?? ""
         let needsRevision = text.contains("возвращен на доработку")
+        let revisionComments = extractRevisionComments(from: text) ?? ""
 
         guard let executor, !executor.isEmpty else {
             return nil
@@ -1689,7 +1764,8 @@ struct ContentView: View {
             nextStep: nextStep,
             resolution: resolution,
             needsRevision: needsRevision,
-            createdAt: message.created_at
+            createdAt: message.created_at,
+            revisionComments: revisionComments
         )
     }
 
@@ -1708,8 +1784,10 @@ struct ContentView: View {
 
         if needsRevision {
             directorTasks[index].stage = .inProgress
+            directorTasks[index].completedAt = nil
         } else if !parsedStatus.isEmpty {
             directorTasks[index].stage = .control
+            directorTasks[index].completedAt = nowText()
         }
 
         var notes: [String] = []
@@ -1742,6 +1820,23 @@ struct ContentView: View {
             .prefix(4)
             .joined(separator: "\n")
         return block.isEmpty ? nil : block
+    }
+
+    private func matchesSelectedRoleFilter(_ task: DirectorTask) -> Bool {
+        switch selectedTaskRoleFilter {
+        case .all:
+            return true
+        case .director:
+            return task.assignee == "Директор"
+        case .legal:
+            return task.assignee == "Юрист"
+        case .pto:
+            return task.assignee == "ПТО"
+        case .finance:
+            return task.assignee == "Финансы"
+        case .supply:
+            return task.assignee == "Снабжение"
+        }
     }
 
     private func firstMatch(in text: String, pattern: String) -> String? {
