@@ -24,6 +24,14 @@ struct ContentView: View {
     }
 
     private struct DirectorTask: Codable, Identifiable, Equatable {
+        struct Event: Codable, Identifiable, Equatable {
+            let id: String
+            let title: String
+            let detail: String
+            let createdAt: String
+            let tint: String
+        }
+
         enum Priority: String, Codable, CaseIterable {
             case high = "Высокий"
             case medium = "Средний"
@@ -61,9 +69,56 @@ struct ContentView: View {
         var assignee: String
         var stage: Stage
         var completedAt: String?
+        var timeline: [Event]
+        var unreadAlerts: Int
 
         var isCompleted: Bool {
             completedAt != nil
+        }
+
+        init(
+            id: String,
+            title: String,
+            detail: String,
+            createdAt: String,
+            dueAt: String?,
+            priority: Priority,
+            assignee: String,
+            stage: Stage,
+            completedAt: String?,
+            timeline: [Event] = [],
+            unreadAlerts: Int = 0
+        ) {
+            self.id = id
+            self.title = title
+            self.detail = detail
+            self.createdAt = createdAt
+            self.dueAt = dueAt
+            self.priority = priority
+            self.assignee = assignee
+            self.stage = stage
+            self.completedAt = completedAt
+            self.timeline = timeline
+            self.unreadAlerts = unreadAlerts
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case id, title, detail, createdAt, dueAt, priority, assignee, stage, completedAt, timeline, unreadAlerts
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(String.self, forKey: .id)
+            title = try container.decode(String.self, forKey: .title)
+            detail = try container.decode(String.self, forKey: .detail)
+            createdAt = try container.decode(String.self, forKey: .createdAt)
+            dueAt = try container.decodeIfPresent(String.self, forKey: .dueAt)
+            priority = try container.decode(Priority.self, forKey: .priority)
+            assignee = try container.decode(String.self, forKey: .assignee)
+            stage = try container.decode(Stage.self, forKey: .stage)
+            completedAt = try container.decodeIfPresent(String.self, forKey: .completedAt)
+            timeline = try container.decodeIfPresent([Event].self, forKey: .timeline) ?? []
+            unreadAlerts = try container.decodeIfPresent(Int.self, forKey: .unreadAlerts) ?? 0
         }
     }
 
@@ -128,6 +183,7 @@ struct ContentView: View {
                     switch selectedSection {
                     case .overview:
                         directorSummaryCard
+                        directorAlertsCard
                         executionControlCard
                         directorTaskBoardCard
                         executionInboxCard
@@ -386,6 +442,20 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
+                if unreadAlertTasksCount > 0 {
+                    HStack(spacing: 8) {
+                        Image(systemName: "bell.badge.fill")
+                            .foregroundStyle(.orange)
+                        Text("Есть новые сигналы директора: \(unreadAlertTasksCount)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.10))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+
                 if let lastAssistant = assistantMessages.last {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Последняя резолюция")
@@ -416,6 +486,62 @@ struct ContentView: View {
                     }
                     .buttonStyle(.bordered)
                     .disabled(isDirectorBusy)
+                }
+            }
+        }
+    }
+
+    private var directorAlertsCard: some View {
+        card {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Сигналы директора")
+                            .font(.headline)
+                        Text("Новые возвраты и замечания к задачам")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if unreadAlertTasksCount > 0 {
+                        taskMetaChip(text: "\(unreadAlertTasksCount)", tint: .orange)
+                    }
+                }
+
+                if alertTasks.isEmpty {
+                    taskPlaceholder("Новых возвратов на доработку пока нет.")
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(alertTasks.prefix(3)) { task in
+                            Button {
+                                selectedTaskID = task.id
+                                markTaskAlertsRead(task.id)
+                            } label: {
+                                HStack(alignment: .top, spacing: 10) {
+                                    Circle()
+                                        .fill(Color.orange.opacity(0.18))
+                                        .frame(width: 30, height: 30)
+                                        .overlay(Image(systemName: "bell.badge.fill").foregroundStyle(.orange))
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(task.title)
+                                            .font(.footnote.weight(.semibold))
+                                        Text(latestRevisionText(for: task) ?? "Есть новое замечание директора")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(2)
+                                    }
+                                    Spacer()
+                                    Text("\(task.unreadAlerts)")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(.orange)
+                                }
+                                .padding(10)
+                                .background(Color.orange.opacity(0.10))
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
             }
         }
@@ -812,8 +938,45 @@ struct ContentView: View {
                             }
                         }
                     }
+
+                    if let latestRevision = latestRevisionText(for: task), !latestRevision.isEmpty {
+                        card {
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "exclamationmark.bubble.fill")
+                                        .foregroundStyle(.orange)
+                                    Text("Последняя доработка")
+                                        .font(.headline)
+                                }
+                                Text(latestRevision)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                    }
+
+                    card {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Таймлайн задачи")
+                                .font(.headline)
+
+                            if task.timeline.isEmpty {
+                                taskPlaceholder("История действий по задаче появится здесь.")
+                            } else {
+                                VStack(spacing: 10) {
+                                    ForEach(task.timeline.reversed()) { event in
+                                        taskTimelineRow(event)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 .padding(14)
+            }
+            .onAppear {
+                markTaskAlertsRead(task.id)
             }
             .background(backgroundView)
             .preferredColorScheme(useDarkMode ? .dark : .light)
@@ -1266,6 +1429,34 @@ struct ContentView: View {
         }
     }
 
+    private func taskTimelineRow(_ event: DirectorTask.Event) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Circle()
+                .fill(colorForTimelineTint(event.tint).opacity(0.18))
+                .frame(width: 28, height: 28)
+                .overlay(Image(systemName: timelineIcon(for: event.tint)).foregroundStyle(colorForTimelineTint(event.tint)))
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(event.title)
+                        .font(.footnote.weight(.semibold))
+                    Spacer()
+                    Text(event.createdAt)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                if !event.detail.isEmpty {
+                    Text(event.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .padding(10)
+        .background(Color(.secondarySystemBackground).opacity(useDarkMode ? 0.35 : 0.8))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
     @ViewBuilder
     private func directorBubble(message: DirectorMessage, isAssistant: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -1573,6 +1764,14 @@ struct ContentView: View {
         directorTasks.filter { $0.isCompleted }.reversed()
     }
 
+    private var alertTasks: [DirectorTask] {
+        activeDirectorTasks.filter { $0.unreadAlerts > 0 }
+    }
+
+    private var unreadAlertTasksCount: Int {
+        alertTasks.reduce(0) { $0 + $1.unreadAlerts }
+    }
+
     private var filteredActiveDirectorTasks: [DirectorTask] {
         activeDirectorTasks.filter(matchesSelectedRoleFilter)
     }
@@ -1616,7 +1815,17 @@ struct ContentView: View {
             priority: priority,
             assignee: inferAssignee(from: trimmed),
             stage: .new,
-            completedAt: nil
+            completedAt: nil,
+            timeline: [
+                DirectorTask.Event(
+                    id: UUID().uuidString,
+                    title: "Задача создана",
+                    detail: trimmed,
+                    createdAt: nowText(),
+                    tint: "blue"
+                )
+            ],
+            unreadAlerts: 0
         )
         directorTasks.append(task)
         saveDirectorTasks()
@@ -1634,7 +1843,17 @@ struct ContentView: View {
             priority: priority,
             assignee: inferAssignee(from: detail.isEmpty ? name : detail),
             stage: .new,
-            completedAt: nil
+            completedAt: nil,
+            timeline: [
+                DirectorTask.Event(
+                    id: UUID().uuidString,
+                    title: "Документ поставлен в работу",
+                    detail: detail.isEmpty ? name : "\(name): \(detail)",
+                    createdAt: nowText(),
+                    tint: "blue"
+                )
+            ],
+            unreadAlerts: 0
         )
         directorTasks.append(task)
         saveDirectorTasks()
@@ -1644,6 +1863,12 @@ struct ContentView: View {
         guard let index = directorTasks.firstIndex(where: { $0.id == id }) else { return }
         directorTasks[index].stage = .control
         directorTasks[index].completedAt = nowText()
+        appendTimelineEvent(
+            to: id,
+            title: "Задача завершена вручную",
+            detail: "Пользователь отметил задачу исполненной.",
+            tint: "green"
+        )
         saveDirectorTasks()
         statusText = "Задача перенесена в исполненные"
     }
@@ -1652,6 +1877,12 @@ struct ContentView: View {
         guard let index = directorTasks.firstIndex(where: { $0.id == id }) else { return }
         directorTasks[index].stage = .inProgress
         directorTasks[index].completedAt = nil
+        appendTimelineEvent(
+            to: id,
+            title: "Задача возвращена в работу",
+            detail: "Исполнение возобновлено после ручного возврата.",
+            tint: "orange"
+        )
         saveDirectorTasks()
         statusText = "Задача возвращена в текущие"
     }
@@ -1661,12 +1892,15 @@ struct ContentView: View {
         switch directorTasks[index].stage {
         case .new:
             directorTasks[index].stage = .inProgress
+            appendTimelineEvent(to: id, title: "Задача переведена в работу", detail: "Поручение взято в исполнение.", tint: "orange")
             statusText = "Задача переведена в работу"
         case .inProgress:
             directorTasks[index].stage = .control
+            appendTimelineEvent(to: id, title: "Задача переведена на контроль", detail: "Ожидается итоговый результат или проверка.", tint: "purple")
             statusText = "Задача переведена на контроль"
         case .control:
             directorTasks[index].stage = .new
+            appendTimelineEvent(to: id, title: "Задача возвращена к исполнению", detail: "Контроль снят, задача снова активна.", tint: "blue")
             statusText = "Задача возвращена к исполнению"
         }
         saveDirectorTasks()
@@ -1785,9 +2019,11 @@ struct ContentView: View {
         if needsRevision {
             directorTasks[index].stage = .inProgress
             directorTasks[index].completedAt = nil
+            directorTasks[index].unreadAlerts += 1
         } else if !parsedStatus.isEmpty {
             directorTasks[index].stage = .control
             directorTasks[index].completedAt = nowText()
+            directorTasks[index].unreadAlerts = 0
         }
 
         var notes: [String] = []
@@ -1810,7 +2046,81 @@ struct ContentView: View {
             }
         }
 
+        if needsRevision {
+            appendTimelineEvent(
+                to: directorTasks[index].id,
+                title: "Возврат на доработку",
+                detail: extractRevisionComments(from: reply ?? "") ?? "Директор вернул результат с замечаниями.",
+                tint: "orange"
+            )
+        } else if !parsedStatus.isEmpty {
+            appendTimelineEvent(
+                to: directorTasks[index].id,
+                title: "Результат принят директором",
+                detail: parsedSummary.isEmpty ? "Исполнитель завершил работу, директор подтвердил результат." : parsedSummary,
+                tint: "green"
+            )
+        }
+
         saveDirectorTasks()
+    }
+
+    private func appendTimelineEvent(to id: String, title: String, detail: String, tint: String) {
+        guard let index = directorTasks.firstIndex(where: { $0.id == id }) else { return }
+        if let last = directorTasks[index].timeline.last,
+           last.title == title,
+           last.detail == detail,
+           last.tint == tint {
+            return
+        }
+        let event = DirectorTask.Event(
+            id: UUID().uuidString,
+            title: title,
+            detail: detail,
+            createdAt: nowText(),
+            tint: tint
+        )
+        directorTasks[index].timeline.append(event)
+    }
+
+    private func latestRevisionText(for task: DirectorTask) -> String? {
+        task.timeline.last(where: { $0.tint == "orange" })?.detail
+    }
+
+    private func markTaskAlertsRead(_ id: String) {
+        guard let index = directorTasks.firstIndex(where: { $0.id == id }) else { return }
+        directorTasks[index].unreadAlerts = 0
+        saveDirectorTasks()
+    }
+
+    private func colorForTimelineTint(_ tint: String) -> Color {
+        switch tint {
+        case "green":
+            return .green
+        case "orange":
+            return .orange
+        case "purple":
+            return .purple
+        case "red":
+            return .red
+        default:
+            return .blue
+        }
+    }
+
+    private func timelineIcon(for tint: String) -> String {
+        switch tint {
+        case "green":
+            return "checkmark.circle.fill"
+        case "orange":
+            return "arrow.uturn.backward.circle.fill"
+        case "purple":
+            return "eye.circle.fill"
+        case "red":
+            return "exclamationmark.triangle.fill"
+        default:
+            return "circle.fill"
+        }
     }
 
     private func extractRevisionComments(from text: String) -> String? {
