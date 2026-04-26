@@ -1,0 +1,65 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/cloud/Dockerfile
+    container_name: stroystandart-api
+    restart: unless-stopped
+    env_file:
+      - ../../.env.cloud
+    environment:
+      SERVICE_MODE: api
+      CLOUD_MODE: "1"
+      OBSIDIAN_VAULT_PATH: /app/obsidian_vault
+    volumes:
+      - ../../data:/app/data
+      - ../../output:/app/output
+      - ../../obsidian_vault:/app/obsidian_vault
+    expose:
+      - "8787"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  bot:
+    build:
+      context: ../..
+      dockerfile: deploy/cloud/Dockerfile
+    container_name: stroystandart-bot
+    restart: unless-stopped
+    env_file:
+      - ../../.env.cloud
+    environment:
+      SERVICE_MODE: bot
+      CLOUD_MODE: "1"
+      OBSIDIAN_VAULT_PATH: /app/obsidian_vault
+    volumes:
+      - ../../data:/app/data
+      - ../../output:/app/output
+      - ../../obsidian_vault:/app/obsidian_vault
+    depends_on:
+      api:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2
+    container_name: stroystandart-caddy
+    restart: unless-stopped
+    env_file:
+      - ../../.env.cloud
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

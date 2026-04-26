@@ -1,0 +1,16 @@
+[Unit]
+Description=StroyStandart Cloud Stack
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/stroystandart
+ExecStart=/usr/bin/docker compose -f deploy/cloud/docker-compose.cloud.yml up -d --build
+ExecStop=/usr/bin/docker compose -f deploy/cloud/docker-compose.cloud.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

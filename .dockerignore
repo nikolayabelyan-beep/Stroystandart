@@ -1,0 +1,17 @@
+.git
+.gitignore
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+node_modules/
+output/
+data/runtime/
+ios/
+*.xcworkspace
+*.xcodeproj/xcuserdata

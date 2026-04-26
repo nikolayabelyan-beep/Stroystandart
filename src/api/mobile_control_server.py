@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import re
 import base64
@@ -38,6 +39,7 @@ STOP_SCRIPT = BASE_DIR / "scripts" / "stop_services.sh"
 DIRECTOR_UPLOADS_DIR = BASE_DIR / "data" / "director_uploads"
 DIRECTOR_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 DIRECTOR_CHAT_ID = 990001
+CLOUD_MODE = os.getenv("CLOUD_MODE", "0").strip().lower() in {"1", "true", "yes", "on"}
 
 UPDATE_STATE = {
     "running": False,
@@ -272,6 +274,27 @@ def _pgrep(pattern: str) -> tuple[int, str]:
 
 
 def services_status() -> dict:
+    if CLOUD_MODE:
+        return {
+            "api_process": True,
+            "bot_process": True,
+            "api_supervisor": True,
+            "bot_supervisor": True,
+            "watchdog_process": True,
+            "api_health": True,
+            "api_ps": "cloud-managed",
+            "bot_ps": "cloud-managed",
+            "api_supervisor_ps": "docker/orchestrator",
+            "bot_supervisor_ps": "docker/orchestrator",
+            "watchdog_ps": "cloud-mode",
+            "api_rc": 0,
+            "bot_rc": 0,
+            "api_sup_rc": 0,
+            "bot_sup_rc": 0,
+            "watchdog_rc": 0,
+            "status_source": "cloud-mode",
+        }
+
     api_rc, api_out = _pgrep("mobile_control_server.py --host 0.0.0.0 --port 8787")
     bot_rc, bot_out = _pgrep("src.bot.telegram_app")
     api_sup_rc, api_sup_out = _pgrep("run_api_supervisor.sh")
@@ -307,6 +330,14 @@ def services_status() -> dict:
 
 
 def ensure_services() -> dict:
+    if CLOUD_MODE:
+        payload = {
+            "ok": True,
+            "rc": 0,
+            "output": "cloud mode enabled: services are supervised by container runtime",
+        }
+        payload.update(services_status())
+        return payload
     if not START_SCRIPT.exists():
         return {"ok": False, "error": f"missing start script: {START_SCRIPT}"}
     cmd = shlex.quote(str(START_SCRIPT))
