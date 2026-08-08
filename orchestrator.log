@@ -18,3 +18,27 @@ nohup: ignoring input
 2026-08-08 21:35:32,699 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/sendMessage "HTTP/1.1 200 OK"
 2026-08-08 21:35:32,700 - __main__ - ERROR - Error processing message: 'RiskScoringEngine' object has no attribute 'analyze_document'
 2026-08-08 21:35:32,888 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/editMessageText "HTTP/1.1 200 OK"
+2026-08-08 21:35:41,579 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/getUpdates "HTTP/1.1 200 OK"
+2026-08-08 21:35:41,581 - __main__ - INFO - Received text: Напиши письмо заказчику из кагальникого ЦРБ на пре...
+2026-08-08 21:35:42,089 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/sendMessage "HTTP/1.1 200 OK"
+2026-08-08 21:35:42,090 - __main__ - ERROR - Error processing message: 'RiskScoringEngine' object has no attribute 'analyze_document'
+2026-08-08 21:35:42,272 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/editMessageText "HTTP/1.1 200 OK"
+2026-08-08 21:35:51,744 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/getUpdates "HTTP/1.1 200 OK"
+2026-08-08 21:36:01,907 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/getUpdates "HTTP/1.1 200 OK"
+2026-08-08 21:36:12,072 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/getUpdates "HTTP/1.1 200 OK"
+2026-08-08 21:36:14,187 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/getUpdates "HTTP/1.1 200 OK"
+2026-08-08 21:36:14,189 - __main__ - INFO - Received text: Напиши письмо заказчику из кагальникого ЦРБ на пре...
+2026-08-08 21:36:14,696 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/sendMessage "HTTP/1.1 200 OK"
+2026-08-08 21:36:14,697 - __main__ - ERROR - Error processing message: 'RiskScoringEngine' object has no attribute 'analyze_document'
+2026-08-08 21:36:14,877 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/editMessageText "HTTP/1.1 200 OK"
+2026-08-08 21:36:24,353 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/getUpdates "HTTP/1.1 200 OK"
+2026-08-08 21:36:34,523 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/getUpdates "HTTP/1.1 200 OK"
+2026-08-08 21:36:34,694 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/getUpdates "HTTP/1.1 200 OK"
+2026-08-08 21:36:34,696 - __main__ - INFO - Received text: Напиши письмо заказчику из кагальникого ЦРБ на пре...
+2026-08-08 21:36:35,212 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/sendMessage "HTTP/1.1 200 OK"
+2026-08-08 21:36:35,213 - __main__ - ERROR - Error processing message: 'RiskScoringEngine' object has no attribute 'analyze_document'
+2026-08-08 21:36:35,406 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/editMessageText "HTTP/1.1 200 OK"
+2026-08-08 21:36:38,196 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y/getUpdates "HTTP/1.1 200 OK"
+2026-08-08 21:36:38,197 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2026-08-08 21:36:38,197 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2026-08-08 21:36:38,207 - telegram.ext.Application - INFO - Application.stop() complete

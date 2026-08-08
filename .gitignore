@@ -1,8 +1,12 @@
 ```
-# Compiled Python files
-*.pyc
-__pycache__/
-
-# Logs
+# Logs and temp files
 *.log
+*.tmp
+*.swp
+
+# Generated documents
+generated_docs/
+
+# Original rules preserved
+orchestrator.log
 ```

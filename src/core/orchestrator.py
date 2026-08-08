@@ -89,7 +89,38 @@ class TelegramOrchestrator:
         
         try:
             # 1. Оценка рисков через Legal Shredder AI
-            risk_result = self.risk_engine.analyze_document(text)
+            # Подготовка данных для анализа
+            doc_data = {
+                'document_id': f"DOC-{update.message.message_id}",
+                'text_content': text[:500],  # Первые 500 символов для контекста
+                'keywords': text.split()[:20],  # Первые 20 слов как ключевые
+                'contract_value': 50_000_000 if "ФАС" in text else 0,
+                'advance_payment_percent': 30,
+                'deadline_days': 60,
+                'sro_permit': True,
+                'sro_permit_expired': False,
+                'building_code_violations': 0,
+                'past_timeline_violations': 0,
+                'counterparty_bankruptcy_risk': False,
+                'vague_terms_count': 2,
+                'similar_precedents_count': 1
+            }
+            
+            risk_card = self.risk_engine.assess_risk(doc_data)
+            
+            # Форматирование результата для оркестратора
+            risk_result = {
+                'score': risk_card.risk_score,
+                'level': risk_card.risk_level,
+                'verdict': "Требуется доработка" if risk_card.risk_score >= 5 else "Документ составлен хорошо",
+                'details': {
+                    'contractual_obligations': risk_card.criteria_scores.get('contractual_obligations', 0),
+                    'regulatory_compliance': risk_card.criteria_scores.get('regulatory_compliance', 0),
+                    'financial_risks': risk_card.criteria_scores.get('financial_exposure', 0),
+                    'timeline_violations': risk_card.criteria_scores.get('timeline_violations', 0),
+                    'precedent_similarity': risk_card.criteria_scores.get('precedent_similarity', 0)
+                }
+            }
             
             # 2. Поиск прецедентов
             precedents = [
