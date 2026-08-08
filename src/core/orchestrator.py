@@ -65,7 +65,7 @@ class TelegramOrchestrator:
             file = await context.bot.get_file(document.file_id)
             file_path = f"temp/{document.file_name}"
             os.makedirs("temp", exist_ok=True)
-            await file.download_to_drive(file_path)
+            await file.download_to_custom(file_path)
             logger.info(f"Received document: {document.file_name}")
             
             try:
@@ -74,6 +74,8 @@ class TelegramOrchestrator:
                         text = f.read()
                 elif document.file_name.endswith('.pdf'):
                     text = f"[Содержимое PDF: {document.file_name}]"
+                elif document.file_name.endswith('.docx'):
+                    text = f"[Содержимое DOCX: {document.file_name}]"
                 else:
                     text = f"[Документ: {document.file_name}]"
             except Exception as e:
@@ -86,49 +88,81 @@ class TelegramOrchestrator:
         status_msg = await update.message.reply_text("⏳ Анализирую документ...")
         
         try:
+            # 1. Оценка рисков через Legal Shredder AI
             risk_result = self.risk_engine.analyze_document(text)
             
+            # 2. Поиск прецедентов
             precedents = [
                 {"id": "PREC-2023-001", "summary": "Нарушение сроков (форс-мажор)", "relevance": 0.95},
                 {"id": "PREC-2023-015", "summary": "Качество работ (акты КС-2, КС-3)", "relevance": 0.92}
             ]
             
+            # 3. Определение типа документа и генерация ответа юриста
+            doc_type = "Жалоба ФАС" if ("ФАС" in text or "жалоб" in text.lower() or "антимонопольн" in text.lower()) else "Договор"
+            
+            # 4. Генерация .docx файла с письмом/документом
+            if "ФАС" in text or "жалоб" in text.lower():
+                # Для жалобы ФАС генерируем Дополнение
+                doc_path = self.doc_generator.create_fas_addendum(
+                    complaint_text=text[:1000],
+                    risk_analysis=risk_result['details'],
+                    precedents=precedents
+                )
+                caption = f"📄 ДОПОЛНЕНИЕ К ЖАЛОБЕ (подготовлено юристом)"
+            elif "замен" in text.lower() and ("материал" in text.lower() or "утеплитель" in text.lower()):
+                # Для запроса на замену материала генерируем письмо заказчику
+                doc_path = self.doc_generator.create_client_letter(
+                    client_name="ГБУ РО «Кагальницкая ЦРБ»",
+                    contract_num="[Номер контракта]",
+                    old_material="[Старая марка]",
+                    new_material="[Новая марка]",
+                    characteristics={}
+                )
+                caption = f"📄 ПИСЬМО ЗАКАЗЧИКУ о замене материала"
+            else:
+                # Стандартный отчет о рисках
+                doc_path = self.doc_generator.create_risk_report(
+                    document_type=doc_type,
+                    risk_score=risk_result['score'],
+                    analysis_details=risk_result['details']
+                )
+                caption = f"📄 Отчет Legal Shredder AI ({doc_type})"
+            
+            # 5. Формирование текстового ответа
             response_text = (
-                f"📊 **АНАЛИЗ ЗАВЕРШЕН**\n\n"
+                f"✅ **АНАЛИЗ ЗАВЕРШЕН**\n\n"
                 f"🔴 **Уровень риска:** {risk_result['score']}/10 ({risk_result['level']})\n\n"
                 f"📋 **Детали:**\n"
                 f"• Договорные обязательства: {risk_result['details']['contractual_obligations']}/10\n"
                 f"• Регуляторика: {risk_result['details']['regulatory_compliance']}/10\n"
                 f"• Финансы: {risk_result['details']['financial_risks']}/10\n\n"
                 f"⚖️ **Вердикт юриста:** {risk_result['verdict']}\n\n"
-                f"📚 **Найдено прецедентов:** {len(precedents)}"
+                f"📎 Ниже прикреплен готовый документ (.docx), подготовленный юристом."
             )
             
             await status_msg.edit_text(response_text, parse_mode='Markdown')
             
-            doc_type = "Жалоба ФАС" if "ФАС" in text or "жалоб" in text.lower() else "Договор"
-            doc_path = self.doc_generator.create_risk_report(
-                document_type=doc_type,
-                risk_score=risk_result['score'],
-                analysis_details=risk_result['details']
-            )
-            
+            # 6. Отправка .docx файла
             await update.message.reply_document(
                 document=open(doc_path, 'rb'),
-                caption=f"📄 Полный отчет Legal Shredder AI ({doc_type})",
+                caption=caption,
                 filename=os.path.basename(doc_path)
             )
             
+            # 7. Логирование в ежедневный отчет
             self.daily_report.append({
                 "type": "analysis",
                 "risk_score": risk_result['score'],
-                "document": doc_type
+                "document": doc_type,
+                "file_generated": doc_path
             })
             
+            # 8. HIGH RISK Alert
             if risk_result['score'] >= 7:
                 await context.bot.send_message(
                     chat_id=self.chat_id,
-                    text=f"🔴 HIGH RISK ALERT: {risk_result['score']}/10\n{doc_type}\n{text[:200]}"
+                    text=f"🔴 **HIGH RISK ALERT:** {risk_result['score']}/10\n{doc_type}\n{text[:200]}...",
+                    parse_mode='Markdown'
                 )
                 
         except Exception as e:
