@@ -29,7 +29,15 @@ from src.tools.legal_updates_fetcher import run as run_legal_updates
 from src.bot.history import add_message, get_history, clear_history
 from src.crew.construction_firm import run_crew
 from src.core.reporter import BusinessReporter
+from src.core.orchestrator import Orchestrator
+import yaml
 
+# Загрузка конфигурации агентов
+with open("agents_config.yaml", "r", encoding="utf-8") as f:
+    agents_config = yaml.safe_load(f)
+
+# Инициализация оркестратора
+orchestrator = Orchestrator(agents_config)
 reporter = BusinessReporter()
 
 # Сохраняем выбранного агента для каждого пользователя
@@ -155,36 +163,43 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await report_now_cmd(update, context)
         return
 
-    agent = user_agents.get(chat_id, "Директор (Авто-распределение)")
+    # НОВОЕ: Передача управления Оркестратору для всех входящих сообщений
+    agent = "Orchestrator (AI Office)"
     
     # Имитация раздумий
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")
-    status_msg = await update.message.reply_text(f"⏳ *{agent}* готовит ответ...", parse_mode="Markdown")
+    status_msg = await update.message.reply_text(f"⏳ *{agent}* анализирует документ...", parse_mode="Markdown")
     
     try:
         add_message(chat_id, "user", user_text)
-        history = get_history(chat_id)
-        existing_files = set(os.listdir(OUTPUT_DIR)) if os.path.exists(OUTPUT_DIR) else set()
         
-        # Периодически обновляем "typing", если процесс долгий
-        response = await asyncio.to_thread(run_crew, user_text, agent, history)
+        # Получение файла если есть
+        file_path = None
+        if update.message.document:
+            file = await update.message.document.get_file()
+            file_path = f"/tmp/{update.message.document.file_name}"
+            await file.download_to_drive(file_path)
+            logger.info(f"File downloaded: {file_path}")
         
-        add_message(chat_id, "assistant", response)
-        for i in range(0, len(response), 4000):
-            await update.message.reply_text(response[i:i+4000])
+        # Вызов оркестратора вместо run_crew
+        response_text = await orchestrator.process_message(user_text, file_path)
+        
+        add_message(chat_id, "assistant", response_text)
+        
+        # Отправка текстового отчета частями
+        for i in range(0, len(response_text), 4000):
+            await update.message.reply_text(response_text[i:i+4000])
             
-        new_files = set(os.listdir(OUTPUT_DIR)) - existing_files if os.path.exists(OUTPUT_DIR) else set()
-        for nf in new_files:
-            file_path = os.path.join(OUTPUT_DIR, nf)
-            with open(file_path, 'rb') as doc:
-                await context.bot.send_document(chat_id=chat_id, document=doc, caption=nf)
-                
+        # Файл .docx уже отправлен внутри orchestrator.process_message()
+        
     except Exception as e:
-        logger.error(f"Error: {e}")
-        await update.message.reply_text(f"❌ Системная ошибка: {str(e)}")
+        logger.error(f"Error in orchestrator: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ Ошибка обработки: {str(e)}")
     finally:
-        try: await status_msg.delete()
-        except: pass
+        try: 
+            await status_msg.delete()
+        except: 
+            pass
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(

@@ -1,257 +1,202 @@
-"""
-Telegram Bot Orchestrator for AI Office
-Listens for messages/documents, processes them via agents, and replies with results + files
-"""
-
-import asyncio
 import logging
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-import os
-import sys
-from datetime import time as dt_time
+from datetime import datetime
+from typing import Dict, Any, Optional
+from .risk_scoring_engine import RiskScoringEngine
+from .notification_service import NotificationService
 
-# Add parent dir to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from core.risk_scoring_engine import RiskScoringEngine
-from core.notification_service import NotificationService
-from core.document_generator import DocumentGenerator
-
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
 logger = logging.getLogger(__name__)
 
-class TelegramOrchestrator:
-    """Telegram бот с полной автономией"""
-    
-    def __init__(self, token: str, chat_id: int):
-        self.token = token
-        self.chat_id = chat_id
+class Orchestrator:
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
         self.risk_engine = RiskScoringEngine()
-        self.notifier = NotificationService()
-        self.doc_generator = DocumentGenerator()
-        self.daily_report = []
+        self.notification_service = NotificationService(config_path='agents_config.yaml')
+        # Память активной сессии для обработки правок
+        self.active_session = {
+            "is_active": False,
+            "document_id": None,
+            "last_verdict": None,
+            "original_content": "",
+            "user_feedback_history": []
+        }
+        logger.info("Orchestrator initialized with session management")
+
+    async def process_message(self, message_text: str, file_path: Optional[str] = None) -> str:
+        """
+        Обрабатывает входящее сообщение.
+        Если есть активная сессия и статус ожидает правки -> обрабатывает как комментарий.
+        Иначе -> начинает новый процесс анализа.
+        """
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
         
-    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text(
-            "🤖 ИИ-Офис ООО 'СТРОЙСТАНДАРТ' активирован!\n\n"
-            "Я могу:\n"
-            "• Анализировать договоры и жалобы\n"
-            "• Оценивать юридические риски (1-10)\n"
-            "• Генерировать документы (.docx)\n"
-            "• Искать прецеденты\n\n"
-            "Отправьте мне документ или текст для анализа."
+        # 1. Проверка: Это правка к предыдущему документу?
+        if self.active_session["is_active"] and self.active_session.get("status") == "AWAITING_USER_FEEDBACK":
+            logger.info(f"Получена правка пользователя для документа {self.active_session['document_id']}")
+            return await self._handle_user_feedback(message_text)
+
+        # 2. Новый запрос
+        logger.info(f"Получен новый документ/запрос: {message_text[:50]}...")
+        
+        content = message_text
+        if file_path:
+            content = f"[Файл: {file_path}]\n{message_text}"
+            # Здесь должна быть логика чтения файла (PDF/DOCX), пока эмулируем текстом
+        
+        # Запуск глубокого анализа
+        analysis_result = await self._run_deep_analysis(content)
+        
+        # Сохранение сессии для будущих правок
+        self.active_session.update({
+            "is_active": True,
+            "document_id": f"DOC-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "status": "AWAITING_USER_FEEDBACK",
+            "last_verdict": analysis_result['verdict'],
+            "original_content": content,
+            "user_feedback_history": []
+        })
+        
+        return analysis_result['report_text']
+
+    async def _handle_user_feedback(self, feedback_text: str) -> str:
+        """Обрабатывает комментарии пользователя и обновляет документ"""
+        doc_id = self.active_session["document_id"]
+        logger.info(f"Обработка правки для {doc_id}: {feedback_text}")
+        
+        # Сохраняем историю правок
+        self.active_session["user_feedback_history"].append({
+            "timestamp": datetime.now().isoformat(),
+            "comment": feedback_text
+        })
+        
+        # Передаем юристу на доработку с учетом комментариев
+        updated_result = await self.risk_engine.revise_document(
+            original_content=self.active_session["original_content"],
+            previous_verdict=self.active_session["last_verdict"],
+            user_comments=feedback_text,
+            history=self.active_session["user_feedback_history"]
         )
-    
-    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user_id = update.effective_user.id
         
-        if user_id != self.chat_id:
-            logger.warning(f"Unauthorized access attempt from {user_id}")
-            return
+        # Обновляем сессию
+        self.active_session["last_verdict"] = updated_result['verdict']
+        # Генерируем новый файл .docx с учетом правок
+        file_path = await self._generate_docx(updated_result, suffix="_v2")
         
-        text = None
-        file_path = None
-        
-        if update.message and update.message.text:
-            text = update.message.text
-            logger.info(f"Received text: {text[:50]}...")
-        
-        elif update.message and update.message.document:
-            document = update.message.document
-            file = await context.bot.get_file(document.file_id)
-            file_path = f"temp/{document.file_name}"
-            os.makedirs("temp", exist_ok=True)
-            await file.download_to_custom(file_path)
-            logger.info(f"Received document: {document.file_name}")
-            
-            try:
-                if document.file_name.endswith('.txt'):
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        text = f.read()
-                elif document.file_name.endswith('.pdf'):
-                    text = f"[Содержимое PDF: {document.file_name}]"
-                elif document.file_name.endswith('.docx'):
-                    text = f"[Содержимое DOCX: {document.file_name}]"
-                else:
-                    text = f"[Документ: {document.file_name}]"
-            except Exception as e:
-                logger.error(f"Error reading file: {e}")
-                text = f"[Ошибка чтения файла: {e}]"
-        
-        if not text:
-            return
-        
-        status_msg = await update.message.reply_text("⏳ Анализирую документ...")
-        
-        try:
-            # 1. Оценка рисков через Legal Shredder AI
-            # Подготовка данных для анализа
-            doc_data = {
-                'document_id': f"DOC-{update.message.message_id}",
-                'text_content': text[:500],  # Первые 500 символов для контекста
-                'keywords': text.split()[:20],  # Первые 20 слов как ключевые
-                'contract_value': 50_000_000 if "ФАС" in text else 0,
-                'advance_payment_percent': 30,
-                'deadline_days': 60,
-                'sro_permit': True,
-                'sro_permit_expired': False,
-                'building_code_violations': 0,
-                'past_timeline_violations': 0,
-                'counterparty_bankruptcy_risk': False,
-                'vague_terms_count': 2,
-                'similar_precedents_count': 1
-            }
-            
-            risk_card = self.risk_engine.assess_risk(doc_data)
-            
-            # Форматирование результата для оркестратора
-            risk_result = {
-                'score': risk_card.risk_score,
-                'level': risk_card.risk_level,
-                'verdict': "Требуется доработка" if risk_card.risk_score >= 5 else "Документ составлен хорошо",
-                'details': {
-                    'contractual_obligations': risk_card.criteria_scores.get('contractual_obligations', 0),
-                    'regulatory_compliance': risk_card.criteria_scores.get('regulatory_compliance', 0),
-                    'financial_risks': risk_card.criteria_scores.get('financial_exposure', 0),
-                    'timeline_violations': risk_card.criteria_scores.get('timeline_violations', 0),
-                    'precedent_similarity': risk_card.criteria_scores.get('precedent_similarity', 0)
-                }
-            }
-            
-            # 2. Поиск прецедентов
-            precedents = [
-                {"id": "PREC-2023-001", "summary": "Нарушение сроков (форс-мажор)", "relevance": 0.95},
-                {"id": "PREC-2023-015", "summary": "Качество работ (акты КС-2, КС-3)", "relevance": 0.92}
-            ]
-            
-            # 3. Определение типа документа и генерация ответа юриста
-            doc_type = "Жалоба ФАС" if ("ФАС" in text or "жалоб" in text.lower() or "антимонопольн" in text.lower()) else "Договор"
-            
-            # 4. Генерация .docx файла с письмом/документом
-            if "ФАС" in text or "жалоб" in text.lower():
-                # Для жалобы ФАС генерируем Дополнение
-                doc_path = self.doc_generator.create_fas_addendum(
-                    complaint_text=text[:1000],
-                    risk_analysis=risk_result['details'],
-                    precedents=precedents
-                )
-                caption = f"📄 ДОПОЛНЕНИЕ К ЖАЛОБЕ (подготовлено юристом)"
-            elif "замен" in text.lower() and ("материал" in text.lower() or "утеплитель" in text.lower()):
-                # Для запроса на замену материала генерируем письмо заказчику
-                doc_path = self.doc_generator.create_client_letter(
-                    client_name="ГБУ РО «Кагальницкая ЦРБ»",
-                    contract_num="[Номер контракта]",
-                    old_material="[Старая марка]",
-                    new_material="[Новая марка]",
-                    characteristics={}
-                )
-                caption = f"📄 ПИСЬМО ЗАКАЗЧИКУ о замене материала"
-            else:
-                # Стандартный отчет о рисках
-                doc_path = self.doc_generator.create_risk_report(
-                    document_type=doc_type,
-                    risk_score=risk_result['score'],
-                    analysis_details=risk_result['details']
-                )
-                caption = f"📄 Отчет Legal Shredder AI ({doc_type})"
-            
-            # 5. Формирование текстового ответа
-            response_text = (
-                f"✅ **АНАЛИЗ ЗАВЕРШЕН**\n\n"
-                f"🔴 **Уровень риска:** {risk_result['score']}/10 ({risk_result['level']})\n\n"
-                f"📋 **Детали:**\n"
-                f"• Договорные обязательства: {risk_result['details']['contractual_obligations']}/10\n"
-                f"• Регуляторика: {risk_result['details']['regulatory_compliance']}/10\n"
-                f"• Финансы: {risk_result['details']['financial_risks']}/10\n\n"
-                f"⚖️ **Вердикт юриста:** {risk_result['verdict']}\n\n"
-                f"📎 Ниже прикреплен готовый документ (.docx), подготовленный юристом."
-            )
-            
-            await status_msg.edit_text(response_text, parse_mode='Markdown')
-            
-            # 6. Отправка .docx файла
-            await update.message.reply_document(
-                document=open(doc_path, 'rb'),
-                caption=caption,
-                filename=os.path.basename(doc_path)
-            )
-            
-            # 7. Логирование в ежедневный отчет
-            self.daily_report.append({
-                "type": "analysis",
-                "risk_score": risk_result['score'],
-                "document": doc_type,
-                "file_generated": doc_path
-            })
-            
-            # 8. HIGH RISK Alert
-            if risk_result['score'] >= 7:
-                await context.bot.send_message(
-                    chat_id=self.chat_id,
-                    text=f"🔴 **HIGH RISK ALERT:** {risk_result['score']}/10\n{doc_type}\n{text[:200]}...",
-                    parse_mode='Markdown'
-                )
-                
-        except Exception as e:
-            logger.error(f"Error processing message: {e}")
-            await status_msg.edit_text(f"❌ Ошибка обработки: {e}")
-    
-    async def send_morning_plan(self, context):
-        plan = (
-            "🌅 **ПЛАН НА ДЕНЬ**\n\n"
-            "1. 🔴 Анализ договора подряда №45/24\n"
-            "2. 🟡 Проверка актов КС-2, КС-3 за апрель\n"
-            "3. 🟢 Поиск прецедентов по качеству бетона\n"
-            "4. 🟡 Оценка рисков срыва сроков (ТЦ Плаза)\n"
-            "5. 🔴 Обработка претензии от Заказчика\n\n"
-            "Всего задач: 5\nВысоких рисков: 2"
+        response = (
+            f"✅ **Правки приняты!**\\n\\n"
+            f"Юрист обновил документ с учетом вашего комментария:\\n"
+            f"_\"{feedback_text}\"_\\n\\n"
+            f"📄 **Обновленный вердикт:** {updated_result['verdict']}\\n"
+            f"📎 Файл с новой версией документа отправлен выше."
         )
-        await context.bot.send_message(chat_id=self.chat_id, text=plan, parse_mode='Markdown')
-    
-    async def send_evening_report(self, context):
-        if not self.daily_report:
-            report = "🌆 **ОТЧЕТ ЗА ДЕНЬ**\n\nЗадач не поступало."
+        
+        await self.notification_service.send_file(file_path, caption="Обновленная версия документа (v2)")
+        return response
+
+    async def _run_deep_analysis(self, content: str) -> Dict[str, Any]:
+        """Запускает полный цикл анализа с детализацией"""
+        # 1. Оценка рисков и детальный отчет
+        risk_data = await self.risk_engine.analyze_full(content)
+        
+        # 2. Поиск прецедентов
+        precedents = await self.risk_engine.find_precedents(content)
+        
+        # 3. Генерация итогового текста отчета
+        report_text = self._format_detailed_report(risk_data, precedents)
+        
+        # 4. Генерация файла .docx
+        file_path = await self._generate_docx(risk_data)
+        
+        # Отправка файла отдельно
+        await self.notification_service.send_file(file_path, caption="📄 Полный юридический анализ и проект документа")
+        
+        return {"report_text": report_text, "verdict": risk_data['verdict']}
+
+    def _format_detailed_report(self, risk_data: Dict, precedents: list) -> str:
+        """Формирует детальный текстовый отчет для чата"""
+        score = risk_data['score']
+        level = risk_data['level']
+        color = "🔴" if level == "HIGH" else "🟡" if level == "MEDIUM" else "🟢"
+        
+        report = (
+            f"{color} **ДЕТАЛЬНЫЙ ЮРИДИЧЕСКИЙ АНАЛИЗ**\\n"
+            f"🆔 Документ: {self.active_session['document_id']}\\n"
+            f"⚖️ **Вердикт:** {risk_data['verdict']}\\n"
+            f"📊 **Уровень риска:** {score}/10 ({level})\\n\\n"
+            f"🔍 **Выявленные проблемы:**\\n"
+            f"{risk_data['detailed_findings']}\\n\\n"
+            f"⚖️ **Применимые нормы права:**\\n"
+            f"{risk_data['legal_references']}\\n\\n"
+            f"💡 **Рекомендации юриста:**\\n"
+            f"{risk_data['recommendations']}\\n\\n"
+            f"🏛 **Найденные прецеденты:**\\n"
+            f"{self._format_precedents_list(precedents)}\\n\\n"
+            f"📝 **Статус:** Ожидает ваших правок или подтверждения."
+        )
+        return report
+
+    def _format_precedents_list(self, precedents: list) -> str:
+        if not precedents:
+            return "По релевантным прецедентам данных не найдено."
+        res = ""
+        for p in precedents[:3]:
+            res += f"- {p['id']}: {p['summary']} (Релевантность: {p['relevance']})\\n"
+        return res
+
+    async def _generate_docx(self, data: Dict, suffix: str = "") -> str:
+        """Генерирует .docx файл с полным отчетом и проектом письма"""
+        from docx import Document
+        from docx.shared import Pt, Inches
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        
+        doc = Document()
+        
+        # Заголовок
+        heading = doc.add_heading('ЮРИДИЧЕСКОЕ ЗАКЛЮЧЕНИЕ И ПРОЕКТ ДОКУМЕНТА', 0)
+        heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        doc.add_paragraph(f"Дата анализа: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+        doc.add_paragraph(f"ID документа: {self.active_session['document_id']}{suffix}")
+        doc.add_paragraph("-" * 50)
+        
+        # Раздел 1: Анализ рисков
+        doc.add_heading('1. АНАЛИЗ РИСКОВ', level=1)
+        p_risk = doc.add_paragraph()
+        p_risk.add_run('Оценка риска: ').bold = True
+        p_risk.add_run(f"{data['score']}/10 ({data['level']})")
+        
+        doc.add_paragraph('Детальное описание проблем:', style='Intense Quote')
+        doc.add_paragraph(data['detailed_findings'])
+        
+        # Раздел 2: Нормативная база
+        doc.add_heading('2. НОРМАТИВНАЯ БАЗА', level=1)
+        doc.add_paragraph(data['legal_references'])
+        
+        # Раздел 3: Рекомендации
+        doc.add_heading('3. РЕКОМЕНДАЦИИ ЮРИСТА', level=1)
+        doc.add_paragraph(data['recommendations'])
+        
+        # Раздел 4: Проект документа (Ответ/Жалоба/Письмо)
+        doc.add_heading('4. ПРОЕКТ ДОКУМЕНТА (ГОТОВЫЙ ТЕКСТ)', level=1)
+        doc.add_paragraph(data['draft_text'], style='No Spacing')
+        
+        filename = f"Legal_Report_{self.active_session['document_id']}{suffix}.docx"
+        filepath = f"/tmp/{filename}"
+        doc.save(filepath)
+        return filepath
+
+    async def send_morning_plan(self):
+        plan = "☀️ **ПЛАН НА СЕГОДНЯ**\\n\\n1. Мониторинг входящих документов.\\n2. Анализ текущих рисков по активным контрактам.\\n3. Проверка сроков подачи отчетности.\\n\\n*Ожидаю ваши документы для работы.*"
+        await self.notification_service.send_message(plan)
+
+    async def send_evening_report(self):
+        report = "🌆 **ОТЧЕТ ЗА ДЕНЬ**\\n\\n"
+        if self.active_session["is_active"]:
+            report += f"✅ Обработан документ: {self.active_session['document_id']}\\n"
+            report += f"Статус: {self.active_session['status']}\\n"
+            if self.active_session["user_feedback_history"]:
+                report += f"Внесено правок пользователем: {len(self.active_session['user_feedback_history'])}\\n"
         else:
-            high_risks = sum(1 for t in self.daily_report if t.get('risk_score', 0) >= 7)
-            report = (
-                f"🌆 **ОТЧЕТ ЗА ДЕНЬ**\n\n"
-                f"Обработано документов: {len(self.daily_report)}\n"
-                f"Высоких рисков выявлено: {high_risks}\n\n"
-                f"**Статус:** Все задачи выполнены ✅"
-            )
+            report += "✅ Активных задач не было. Система в режиме ожидания.\\n"
         
-        await context.bot.send_message(chat_id=self.chat_id, text=report, parse_mode='Markdown')
-        self.daily_report = []
-    
-    async def morning_job(self, context):
-        await self.send_morning_plan(context)
-    
-    async def evening_job(self, context):
-        await self.send_evening_report(context)
-    
-    def run(self):
-        logger.info("Starting Telegram Orchestrator...")
-        
-        application = ApplicationBuilder().token(self.token).build()
-        
-        application.add_handler(CommandHandler("start", self.start))
-        application.add_handler(MessageHandler(filters.TEXT | filters.Document.ALL, self.handle_message))
-        
-        job_queue = application.job_queue
-        job_queue.run_daily(self.morning_job, time=dt_time(8, 0))
-        job_queue.run_daily(self.evening_job, time=dt_time(18, 0))
-        
-        logger.info("Bot is running. Press Ctrl+C to stop.")
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
-
-
-if __name__ == "__main__":
-    TOKEN = "8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y"
-    CHAT_ID = 245477113
-    
-    orchestrator = TelegramOrchestrator(TOKEN, CHAT_ID)
-    orchestrator.run()
+        report += "\\n📅 **ПЛАН НА ЗАВТРА:**\\n- Продолжение мониторинга.\\n- Актуализация базы прецедентов."
+        await self.notification_service.send_message(report)
