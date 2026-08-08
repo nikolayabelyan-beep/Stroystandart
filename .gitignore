@@ -1,37 +1,45 @@
-# Secrets and local env
-.env
-.env.*
-!.env.example
+# Obsidian vault specific
+.obsidian/
+.vault/
 
-# OS/editor
+# General
 .DS_Store
+Thumbs.db
+*.tmp
+*.log
+*.swp
+*~
+
+# Environment variables
+.env
+.env.local
+*.env.*
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage/
+htmlcov/
+
+# Build artifacts
+dist/
+build/
+target/
+*.pyc
+*.class
+*.o
+*.exe
+*.dll
+*.so
+*.a
+*.obj
+*.out
+
+# Editors
 .vscode/
 .idea/
-
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.venv/
-venv/
-
-# Runtime logs/state
-*.log
-data/history/
-data/mobile_api/*.log
-data/runtime/*
-!data/runtime/.gitkeep
-bot_debug.log
-
-# Generated artifacts
-output/
-
-# Local dependencies
-node_modules/
-
-# Xcode derived data
-DerivedData/
-*.xcuserstate
-
-node_modules
