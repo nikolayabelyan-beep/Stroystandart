@@ -116,10 +116,11 @@ class Orchestrator:
                 'timestamp': timestamp,
                 'type': 'analysis',
                 'user_id': user_id,
-                'original_text': user_text[:500],  # Краткая версия для истории
+                'original_text': user_text,  # Сохраняем полный текст для будущих правок
                 'doc_type': self._detect_doc_type(user_text),
                 'risk_score': analysis['risk_score'],
-                'risk_level': analysis['risk_level']
+                'risk_level': analysis['risk_level'],
+                'full_analysis': analysis  # Сохраняем полный анализ
             }
             self.history.append(entry)
             
