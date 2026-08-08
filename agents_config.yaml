@@ -453,3 +453,24 @@ monitoring:
     - "escalation_count"
     - "approval_rate"
     - "false_positive_rate"
+
+
+# =============================================================================
+# НАСТРОЙКИ TELEGRAM (TELEGRAM SETTINGS)
+# =============================================================================
+
+telegram:
+  enabled: true
+  bot_token: "8433856602:AAFY9Feuj0Z0UpJACktnCWJBWYHj3NISB8Y"
+  chat_id: "245477113"
+  base_url: "https://api.telegram.org/bot"
+  
+  notifications:
+    daily_plan_time: "08:00"
+    daily_report_time: "18:00"
+    risk_alert_threshold: 7  # Отправлять alert при риске >= 7
+    
+  timeouts:
+    send_message: 10
+    retry_delay: 5
+    max_retries: 3
