@@ -1,0 +1,92 @@
+{
+  "date": "2024-05-21",
+  "generated_at": "08:00:00",
+  "status": "active",
+  "total_tasks": 5,
+  "tasks": [
+    {
+      "task_id": "TSK-20240521-001",
+      "priority": "HIGH",
+      "category": "legal_review",
+      "assigned_agent": "Legal_Shredder_AI",
+      "description": "Анализ договора подряда №45/24 с ООО 'МонолитСтрой'",
+      "details": {
+        "document_path": "docs/contracts/contract_45_24.pdf",
+        "counterparty": "ООО 'МонолитСтрой'",
+        "amount": 12500000,
+        "deadline": "2024-06-15",
+        "focus_areas": ["штрафные санкции", "форс-мажор", "гарантийные обязательства"]
+      },
+      "expected_output": "Risk Card + резюме рисков",
+      "status": "pending"
+    },
+    {
+      "task_id": "TSK-20240521-002",
+      "priority": "MEDIUM",
+      "category": "compliance_check",
+      "assigned_agent": "Compliance_Checker",
+      "description": "Проверка актов КС-2, КС-3 за апрель 2024 по объекту 'ЖК Северный'",
+      "details": {
+        "object_name": "ЖК Северный",
+        "period": "2024-04",
+        "documents": ["KS2_April_2024.pdf", "KS3_April_2024.pdf"],
+        "check_points": ["соответствие смете", "подписи уполномоченных лиц", "печаті"]
+      },
+      "expected_output": "Отчет о соответствии/несоответствии",
+      "status": "pending"
+    },
+    {
+      "task_id": "TSK-20240521-003",
+      "priority": "LOW",
+      "category": "precedent_search",
+      "assigned_agent": "Precedent_Engine",
+      "description": "Поиск прецедентов по спорам о качестве бетонных работ",
+      "details": {
+        "query_keywords": ["качество бетона", "недостатки работ", "строительные дефекты", "экспертиза"],
+        "jurisdiction": "Арбитражный суд г. Москвы",
+        "time_range": "2022-2024"
+      },
+      "expected_output": "Топ-3 релевантных прецедента с выводами",
+      "status": "pending"
+    },
+    {
+      "task_id": "TSK-20240521-004",
+      "priority": "MEDIUM",
+      "category": "risk_assessment",
+      "assigned_agent": "Risk_Assessor",
+      "description": "Оценка рисков срыва сроков по объекту 'ТЦ Плаза'",
+      "details": {
+        "object_name": "ТЦ Плаза",
+        "current_progress": "67%",
+        "planned_completion": "2024-07-01",
+        "risk_factors": ["поставки материалов", "погодные условия", "кадровый дефицит"]
+      },
+      "expected_output": "Матрица рисков с вероятностью и влиянием",
+      "status": "pending"
+    },
+    {
+      "task_id": "TSK-20240521-005",
+      "priority": "HIGH",
+      "category": "document_processing",
+      "assigned_agent": "Document_Processing_Agent",
+      "description": "Обработка входящей претензии от Заказчика по объекту 'Складской комплекс'",
+      "details": {
+        "claim_number": "PR-2024-089",
+        "claimant": "АО 'Логистик Групп'",
+        "claim_amount": 3200000,
+        "claim_reason": "Нарушение сроков сдачи объекта",
+        "document_path": "docs/claims/claim_089_2024.pdf"
+      },
+      "expected_output": "Извлеченные данные + рекомендация по ответу",
+      "status": "pending"
+    }
+  ],
+  "agent_workload": {
+    "Legal_Shredder_AI": 1,
+    "Compliance_Checker": 1,
+    "Precedent_Engine": 1,
+    "Risk_Assessor": 1,
+    "Document_Processing_Agent": 1
+  },
+  "notes": "План сгенерирован автоматически оркестратором. Приоритеты могут быть изменены при поступлении срочных задач."
+}

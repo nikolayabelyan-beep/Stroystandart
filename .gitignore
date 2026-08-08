@@ -1,26 +1,10 @@
-# Examples 1:
-(empty — output nothing)
-
-# Example 2 (Project with artifacts):
-# Compiled and build artifacts
-*.pyc
+```gitignore
+# Python cache
 __pycache__/
-*.o
-*.obj
-dist/
-build/
-# Dependencies
-.venv/
-venv/
-node_modules/
-# Logs and temp files
+*.pyc
+*.pyo
+*.pyd
+
+# Original rules preserved
 *.log
-*.tmp
-*.swp
-# Environment
-.env
-.env.local
-.env.*
-# Editors
-.vscode/
-.idea/
+```
