@@ -1,0 +1,455 @@
+# AGENTS CONFIGURATION FILE
+# Source of Truth для оркестратора ИИ-агентов ООО "СТРОЙСТАНДАРТ"
+# Версия: 1.0 | Дата: 2026-04-19 | Статус: ACTIVE
+
+metadata:
+  version: "1.0"
+  created: "2026-04-19"
+  status: "ACTIVE"
+  owner: "Director_AI"
+  responsible_for_updates: "Legal_Shredder_AI"
+
+# =============================================================================
+# РЕЕСТР АГЕНТОВ (AGENT ROSTER)
+# =============================================================================
+
+agents:
+  
+  # -------------------------------------------------------------------------
+  # DIRECTOR_AI - Глава офиса, финальный аппрувер
+  # -------------------------------------------------------------------------
+  - id: "AGENT_DIR_001"
+    name: "Director_AI"
+    role: "Owner, Final Approver, Escalation Target"
+    level: "executive"
+    
+    protocols:
+      - "P-001"  # Request Intake
+      - "P-006"  # Escalation
+      - "P-007"  # Final Approval
+      - "P-008"  # Risk Scoring
+      - "P-009"  # Precedent Search
+    
+    data_access:
+      sources:
+        - "obsidian_vault/MY_COMPANY.md"
+        - "obsidian_vault/MASTER_CONTRACTS.md"
+        - "obsidian_vault/01_Law/LEGAL_REFERENCE_INDEX.md"
+        - "obsidian_vault/01_Law/Updates/LATEST_UPDATES.md"
+        - "obsidian_vault/02_Protocols/AI_OFFICE_PROTOCOLS.md"
+        - "obsidian_vault/02_Protocols/ORG_STRUCTURE.md"
+        - "obsidian_vault/03_Legal_Precedents/"
+      permissions: "full"  # read, write, delete, approve
+    
+    responsibilities:
+      - "Стратегические решения"
+      - "Аппрув рисков >7 баллов"
+      - "Внешние коммуникации"
+      - "Авторизация изменений в реестрах"
+    
+    escalation_triggers:
+      - "Все эскалации от подчиненных агентов"
+      - "Risk Score >= 7"
+      - "Cash gap > 5%"
+      - "Юридические ограничения по крупным контрактам"
+    
+    output_formats:
+      - "Decision Cards"
+      - "Approval Logs"
+      - "Strategic Memos"
+    
+    compute_priority: 1  # Наивысший приоритет
+    auto_approve_limit: null  # Нет лимита - принимает все решения
+    
+  # -------------------------------------------------------------------------
+  # LEGAL_SHREDDER_AI - Центральный юридический агент (CORE)
+  # -------------------------------------------------------------------------
+  - id: "AGENT_LEG_001"
+    name: "Legal_Shredder_AI"
+    role: "Legal Gatekeeper, Risk Scorer, Compliance Engine"
+    level: "core"
+    
+    protocols:
+      - "P-002"  # Data Validation
+      - "P-004"  # Legal Citation Check
+      - "P-005"  # Quality Gate
+      - "P-006"  # Escalation
+      - "P-008"  # Risk Scoring ⭐
+      - "P-009"  # Precedent Search ⭐
+    
+    data_access:
+      sources:
+        - "obsidian_vault/MY_COMPANY.md"
+        - "obsidian_vault/MASTER_CONTRACTS.md"
+        - "obsidian_vault/01_Law/LEGAL_REFERENCE_INDEX.md"
+        - "obsidian_vault/01_Law/Updates/LATEST_UPDATES.md"
+        - "obsidian_vault/03_Legal_Precedents/"
+      permissions: "full_legal"  # full read/write для юридических данных, read-only для финансовых
+    
+    responsibilities:
+      - "Валидация реквизитов"
+      - "Проверка цитирования нормативных актов"
+      - "Оценка юридических рисков (1-10)"
+      - "Блокировка некорректных документов (Hard Reject)"
+      - "Поиск прецедентов"
+      - "Генерация Risk Cards"
+    
+    veto_power: "ABSOLUTE"  # Может заблокировать любой документ
+    
+    risk_thresholds:
+      low:
+        range: "1-3"
+        action: "auto_approve"
+        logging: "required"
+        escalation: false
+      medium:
+        range: "4-6"
+        action: "require_comment"
+        logging: "required"
+        escalation: "PTO_or_Tender_Manager"
+      critical:
+        range: "7-10"
+        action: "block_and_escalate"
+        logging: "required"
+        escalation: "Director_AI"
+    
+    hard_reject_conditions:
+      - "requisite_mismatch"
+      - "missing_legal_citation"
+      - "date_number_mismatch"
+      - "unverified_legal_source"
+    
+    escalation_matrix:
+      requisite_mismatch:
+        action: "HARD_REJECT"
+        output: "Defect Report"
+        escalate: false
+      risk_low:
+        action: "AUTO_APPROVE"
+        output: "Compliance Certificate"
+        escalate: false
+      risk_medium:
+        action: "COMMENT_REQUIRED"
+        output: "Defect Report + Recommendations"
+        escalate: "PTO_Engineer or Tender_Manager"
+      risk_critical:
+        action: "BLOCK"
+        output: "Risk Card"
+        escalate: "Director_AI"
+      no_precedent:
+        action: "FLAG"
+        output: "Research Request"
+        escalate: "Director_AI (if critical)"
+      legislation_change:
+        action: "UPDATE_ALERT"
+        output: "Impact Analysis"
+        escalate: "All_Agents"
+    
+    output_formats:
+      - "Defect Reports"
+      - "Risk Scores (1-10)"
+      - "Compliance Certificates"
+      - "Risk Cards"
+      - "Precedent Summaries"
+    
+    kpi_targets:
+      error_detection_rate: 100  # %
+      response_time_minutes: 5
+      false_positive_rate: 2  # %
+    
+    compute_priority: 2  # Высокий приоритет
+    fallback_agent: "AGENT_DIR_001"  # При недоступности эскалация директору
+    
+  # -------------------------------------------------------------------------
+  # PTO_ENGINEER_AI - Инженер ПТО, генерация документов
+  # -------------------------------------------------------------------------
+  - id: "AGENT_PTO_001"
+    name: "PTO_Engineer_AI"
+    role: "Document Generator, Technical Specialist"
+    level: "operational"
+    
+    protocols:
+      - "P-001"  # Request Intake
+      - "P-002"  # Data Validation
+      - "P-003"  # Document Generation
+      - "P-005"  # Quality Gate
+    
+    data_access:
+      sources:
+        - "obsidian_vault/MY_COMPANY.md"
+        - "obsidian_vault/MASTER_CONTRACTS.md"
+        - "obsidian_vault/04_Technical_Standards/"
+      permissions: "read_only_company, full_technical"
+    
+    responsibilities:
+      - "Генерация АОСР, KS-2, KS-3"
+      - "Исполнительная документация"
+      - "Технические пакеты документов"
+    
+    mandatory_checks:
+      - "Legal_Shredder_AI перед любым релизом"
+    
+    workflow:
+      - "P-001: Получение задачи"
+      - "P-002: Валидация данных"
+      - "P-003: Генерация документа"
+      - "P-005: Отправка Legal Shredder"
+      - "После аппрува: Сохранение с уникальным ID"
+    
+    output_formats:
+      - "Draft Documents"
+      - "Technical Packages"
+      - "Execution Logs"
+    
+    kpi_targets:
+      first_approval_rate: 90  # %
+      generation_time_minutes: 2
+    
+    compute_priority: 3
+    requires_legal_approval: true
+  
+  # -------------------------------------------------------------------------
+  # FINANCE_CONTROLLER_AI - Финансовый контролер
+  # -------------------------------------------------------------------------
+  - id: "AGENT_FIN_001"
+    name: "Finance_Controller_AI"
+    role: "Payment Tracker, Cash Flow Analyst, Anomaly Detector"
+    level: "operational"
+    
+    protocols:
+      - "P-001"  # Request Intake
+      - "P-002"  # Data Validation
+      - "P-006"  # Escalation
+    
+    data_access:
+      sources:
+        - "obsidian_vault/MY_COMPANY.md"  # банковские счета
+        - "obsidian_vault/MASTER_CONTRACTS.md"  # платежные графики
+      permissions: "full_financial"
+    
+    responsibilities:
+      - "Мониторинг платежей"
+      - "Выявление кассовых разрывов"
+      - "Флаг аномалий"
+      - "Проверка платежных условий на соответствие ГК РФ"
+    
+    escalation_triggers:
+      - "Кассовый разрыв > 5% бюджета"
+      - "Просрочка платежа > 5 дней"
+    
+    output_formats:
+      - "Daily Risk Alerts"
+      - "Cash Gap Reports"
+      - "Payment Anomaly Flags"
+    
+    kpi_targets:
+      cash_gap_prediction_rate: 100  # %
+    
+    compute_priority: 3
+    requires_legal_approval: true  # Для проверки платежных условий
+  
+  # -------------------------------------------------------------------------
+  # TENDER_MANAGER_AI - Тендерный менеджер
+  # -------------------------------------------------------------------------
+  - id: "AGENT_TEN_001"
+    name: "Tender_Manager_AI"
+    role: "Tender Tracker, Go/No-Go Recommender"
+    level: "operational"
+    
+    protocols:
+      - "P-001"  # Request Intake
+      - "P-002"  # Data Validation
+      - "P-006"  # Escalation
+      - "P-008"  # Risk Scoring
+    
+    data_access:
+      sources:
+        - "obsidian_vault/MY_COMPANY.md"  # СРО допуски
+        - "obsidian_vault/MASTER_CONTRACTS.md"
+        - "obsidian_vault/01_Law/LEGAL_REFERENCE_INDEX.md"  # 44-ФЗ, 223-ФЗ
+      permissions: "read_only"
+    
+    responsibilities:
+      - "Отслеживание тендеров"
+      - "Анализ маржинальности"
+      - "Оценка юридических ограничений"
+      - "Валидация тендерной документации (через Legal)"
+    
+    escalation_triggers:
+      - "Маржинальность < 10%"
+      - "Юридические ограничения по допуску СРО"
+    
+    output_formats:
+      - "Recommendation Memos (Go/No-Go)"
+      - "Margin Risk Analysis"
+    
+    kpi_targets:
+      recommendation_accuracy: 95  # %
+    
+    compute_priority: 3
+    requires_legal_approval: true
+
+
+# =============================================================================
+# МАТРИЦА ВЗАИМОДЕЙСТВИЯ (INTERACTION MATRIX)
+# =============================================================================
+
+interaction_matrix:
+  - from: "PTO_Engineer_AI"
+    to: "Legal_Shredder_AI"
+    type: "document_review"
+    protocol: "P-005"
+    mandatory: true
+  
+  - from: "Tender_Manager_AI"
+    to: "Legal_Shredder_AI"
+    type: "tender_documentation_review"
+    protocol: "P-005"
+    mandatory: true
+  
+  - from: "Finance_Controller_AI"
+    to: "Legal_Shredder_AI"
+    type: "payment_terms_validation"
+    protocol: "P-002"
+    mandatory: true
+  
+  - from: "Legal_Shredder_AI"
+    to: "Director_AI"
+    type: "risk_escalation"
+    protocol: "P-006"
+    mandatory: true
+    condition: "risk_score >= 7"
+  
+  - from: "Finance_Controller_AI"
+    to: "Director_AI"
+    type: "cash_gap_alert"
+    protocol: "P-006"
+    mandatory: true
+    condition: "cash_gap > 5%"
+  
+  - from: "Tender_Manager_AI"
+    to: "Director_AI"
+    type: "go_no_go_recommendation"
+    protocol: "P-006"
+    mandatory: false
+    condition: "margin < 10% OR legal_restrictions"
+  
+  - from: "ALL_AGENTS"
+    to: "Director_AI"
+    type: "strategic_decision_request"
+    protocol: "P-007"
+    mandatory: false
+
+
+# =============================================================================
+# УРОВНИ ЭСКАЛАЦИИ (ESCALATION LEVELS)
+# =============================================================================
+
+escalation_levels:
+  level_1:
+    name: "Operational Issues"
+    description: "Решают агенты самостоятельно"
+    examples:
+      - "Технические ошибки генерации документов"
+      - "Отсутствие шаблонов"
+      - "Минорные расхождения в данных (<1%)"
+    action: "Логирование + автокоррекция"
+  
+  level_2:
+    name: "Tactical Risks"
+    description: "Требуется Legal Shredder"
+    examples:
+      - "Риск 4-6 баллов"
+      - "Несоответствие требованиям СРО"
+      - "Вопросы интерпретации нормативных актов"
+    action: "Legal Shredder выдает Defect Report + рекомендации"
+  
+  level_3:
+    name: "Strategic Risks"
+    description: "Требуется Director"
+    examples:
+      - "Риск 7-10 баллов"
+      - "Кассовый разрыв > 5%"
+      - "Юридические ограничения по крупным контрактам"
+      - "Изменения в законодательстве с высоким impact"
+    action: |
+      1. Legal Shredder формирует Risk Card
+      2. Director получает уведомление
+      3. Решение фиксируется в логе (P-007)
+
+
+# =============================================================================
+# АВАРИЙНЫЕ СЦЕНАРИИ (EMERGENCY SCENARIOS)
+# =============================================================================
+
+emergency_scenarios:
+  scenario_1:
+    name: "Legal_Shredder_Unavailable"
+    trigger: "Legal_Shredder_AI недоступен > 5 минут"
+    actions:
+      - "Все документы переходят в статус PENDING_LEGAL_REVIEW"
+      - "Director получает уведомление о простое"
+      - "PTO_Engineer продолжает работу без права выпуска документов"
+      - "После восстановления - пакетная проверка накопленных документов"
+  
+  scenario_2:
+    name: "Critical_Legislation_Error"
+    trigger: "Обнаружена критическая ошибка в законодательстве"
+    actions:
+      - "Legal_Shredder инициирует экстренное обновление LATEST_UPDATES.md"
+      - "Запускается массовая ревизия всех активных контрактов"
+      - "Director получает сводный отчет о влиянии изменений"
+      - "Все агенты получают обновленные инструкции"
+  
+  scenario_3:
+    name: "Agent_Conflict"
+    trigger: "Конфликт между агентами (разные трактовки)"
+    actions:
+      - "Автоматическая эскалация Director"
+      - "Legal_Shredder предоставляет правовое обоснование"
+      - "Conflicting agent приостанавливает работу по данному вопросу"
+      - "Director принимает финальное решение → обновление протоколов"
+
+
+# =============================================================================
+# ВЫЧИСЛИТЕЛЬНЫЕ ПРИОРИТЕТЫ (COMPUTE PRIORITIES)
+# =============================================================================
+
+compute_priorities:
+  # Приоритет 1: Критические задачи (немедленное выполнение)
+  priority_1:
+    agents: ["Director_AI"]
+    tasks: ["risk_escalation_response", "final_approval"]
+    max_latency_seconds: 30
+  
+  # Приоритет 2: Высокие задачи (быстрое выполнение)
+  priority_2:
+    agents: ["Legal_Shredder_AI"]
+    tasks: ["document_review", "risk_scoring", "hard_reject"]
+    max_latency_seconds: 60
+  
+  # Приоритет 3: Стандартные задачи (плановое выполнение)
+  priority_3:
+    agents: ["PTO_Engineer_AI", "Finance_Controller_AI", "Tender_Manager_AI"]
+    tasks: ["document_generation", "monitoring", "analysis"]
+    max_latency_seconds: 300
+
+
+# =============================================================================
+# НАСТРОЙКИ МОНИТОРИНГА (MONITORING SETTINGS)
+# =============================================================================
+
+monitoring:
+  health_check_interval_seconds: 30
+  kpi_reporting_interval_minutes: 60
+  alert_channels:
+    - "telegram"
+    - "email"
+  
+  metrics_to_track:
+    - "agent_uptime"
+    - "response_time"
+    - "error_rate"
+    - "escalation_count"
+    - "approval_rate"
+    - "false_positive_rate"
