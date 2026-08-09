@@ -148,7 +148,7 @@ class Orchestrator:
             return 'general'
 
     def generate_docx(self, analysis: Dict[str, Any]) -> bytes:
-        """Генерирует .docx файл с детальным отчетом."""
+        """Генерирует .docx файл с проектом документа на основе контекста."""
         try:
             from docx import Document
             from docx.shared import Pt, Inches
@@ -156,50 +156,44 @@ class Orchestrator:
             
             doc = Document()
             
+            # Определяем тип документа для заголовка
+            doc_type = analysis.get('doc_type', 'general')
+            timestamp = analysis.get('timestamp', datetime.now().isoformat())[:10]
+            
+            if doc_type == 'fas_complaint':
+                title = 'ДОПОЛНЕНИЕ К ЖАЛОБЕ В ФАС'
+            elif doc_type == 'material_change':
+                title = 'ПИСЬМО О ЗАМЕНЕ МАТЕРИАЛА'
+            elif doc_type == 'contract':
+                title = 'ЗАКЛЮЧЕНИЕ ПО ДОГОВОРУ'
+            else:
+                title = 'ЮРИДИЧЕСКИЙ ДОКУМЕНТ'
+            
             # Заголовок
-            heading = doc.add_heading('ЮРИДИЧЕСКОЕ ЗАКЛЮЧЕНИЕ', 0)
+            heading = doc.add_heading(title, 0)
             heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
             
-            # Дата и номер
-            doc.add_paragraph(f'Дата анализа: {analysis["timestamp"][:10]}')
-            doc.add_paragraph(f'Уровень риска: {analysis["risk_level"]} ({analysis["risk_score"]}/10)')
+            # Дата
+            doc.add_paragraph(f'Дата: {timestamp}')
+            doc.add_paragraph(f'От: ООО «СТРОЙСТАНДАРТ»')
+            doc.add_paragraph('_' * 50)
             
-            # Раздел 1: Выявленные проблемы
-            doc.add_heading('1. ВЫЯВЛЕННЫЕ ПРОБЛЕМЫ', level=1)
-            for issue in analysis.get('detected_issues', []):
-                doc.add_paragraph(f'• {issue}', style='List Bullet')
-            
-            if not analysis.get('detected_issues'):
-                doc.add_paragraph('Критических проблем не выявлено.')
-            
-            # Раздел 2: Нормы права
-            doc.add_heading('2. ПРИМЕНИМЫЕ НОРМЫ ПРАВА', level=1)
-            norms = [
-                'Гражданский кодекс РФ (ст. 309, 310, 720-724)',
-                'Федеральный закон № 44-ФЗ "О контрактной системе"',
-                'Федеральный закон № 135-ФЗ "О защите конкуренции"',
-                'Арбитражный процессуальный кодекс РФ'
-            ]
-            for norm in norms:
-                doc.add_paragraph(f'• {norm}', style='List Bullet')
-            
-            # Раздел 3: Рекомендации
-            doc.add_heading('3. РЕКОМЕНДАЦИИ ЮРИСТА', level=1)
-            for rec in analysis.get('recommendations', []):
-                doc.add_paragraph(f'✓ {rec}', style='List Bullet')
-            
-            # Раздел 4: Прецеденты
-            doc.add_heading('4. РЕЛЕВАНТНЫЕ ПРЕЦЕДЕНТЫ', level=1)
-            doc.add_paragraph('Найдены следующие релевантные судебные решения:')
-            doc.add_paragraph('• Дело № А40-12345/2023 - аналогичная ситуация с заменой материала (выиграно)', style='List Bullet')
-            doc.add_paragraph('• Дело № А40-67890/2022 - спор о качестве работ (выиграно)', style='List Bullet')
-            
-            # Раздел 5: Проект документа
-            doc.add_heading('5. ПРОЕКТ ДОКУМЕНТА ДЛЯ ОТПРАВКИ', level=1)
+            # Основной текст - берем из draft_document или генерируем на основе анализа
             draft_text = analysis.get('draft_document', '')
-            for line in draft_text.strip().split('\n'):
-                if line.strip():
-                    doc.add_paragraph(line)
+            
+            if draft_text:
+                for line in draft_text.strip().split('\n'):
+                    if line.strip():
+                        doc.add_paragraph(line)
+            else:
+                # Если draft не сформирован, создаем структуру на основе рекомендаций
+                doc.add_heading('Анализ ситуации', level=1)
+                for issue in analysis.get('detected_issues', []):
+                    doc.add_paragraph(f'• {issue}', style='List Bullet')
+                
+                doc.add_heading('Рекомендации', level=1)
+                for rec in analysis.get('recommendations', []):
+                    doc.add_paragraph(f'✓ {rec}', style='List Bullet')
             
             # Футер
             doc.add_page_break()
@@ -216,21 +210,15 @@ class Orchestrator:
             
             return buffer.getvalue()
             
-        except ImportError:
+        except ImportError as e:
             # Если python-docx не установлен, возвращаем текстовую версию
             report_text = f"""
-ЮРИДИЧЕСКОЕ ЗАКЛЮЧЕНИЕ
-======================
-Дата: {analysis['timestamp'][:10]}
-Риск: {analysis['risk_level']} ({analysis['risk_score']}/10)
+{title}
+{'=' * len(title)}
+Дата: {analysis.get('timestamp', '')[:10]}
+Риск: {analysis.get('risk_level', 'N/A')} ({analysis.get('risk_score', 0)}/10)
 
-1. ВЫЯВЛЕННЫЕ ПРОБЛЕМЫ:
-{chr(10).join(['• ' + i for i in analysis.get('detected_issues', [])]) or 'Нет'}
-
-2. РЕКОМЕНДАЦИИ:
-{chr(10).join(['✓ ' + r for r in analysis.get('recommendations', [])]) or 'Нет'}
-
-3. ПРОЕКТ ДОКУМЕНТА:
+ПРОЕКТ ДОКУМЕНТА:
 {analysis.get('draft_document', 'Не сгенерирован')}
 
 ---

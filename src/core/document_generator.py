@@ -17,50 +17,47 @@ class DocumentGenerator:
         os.makedirs(output_dir, exist_ok=True)
     
     def create_fas_addendum(self, complaint_text: str, risk_analysis: dict, precedents: list) -> str:
-        """Создание дополнения к жалобе в ФАС"""
-        
+        """Создание дополнения к жалобе в ФАС (заглушка удалена, генерируется динамически)"""
+        # Логика перенесена в динамическую генерацию на основе контекста
+        return self._generate_dynamic_document("fas_complaint", complaint_text, risk_analysis, precedents)
+    
+    def _generate_dynamic_document(self, doc_type: str, content: str, analysis: dict, precedents: list) -> str:
+        """Динамическая генерация документа на основе типа и контекста"""
+        from datetime import datetime
         doc = Document()
         
-        # Заголовок
-        header = doc.add_heading('ДОПОЛНЕНИЕ К ЖАЛОБЕ', 0)
-        header.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        today = datetime.now().strftime("%d.%m.%Y")
         
-        doc.add_paragraph(f"В Управление Федеральной антимонопольной службы\nпо Ростовской области")
-        doc.add_paragraph(f"От: ООО «СТРОЙСТАНДАРТ»\nИНН: 6100000000")
-        doc.add_paragraph(f"По делу о нарушении законодательства о закупках")
-        doc.add_paragraph("_" * 50)
+        if doc_type == "fas_complaint":
+            header = doc.add_heading('ДОПОЛНЕНИЕ К ЖАЛОБЕ', 0)
+            header.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            doc.add_paragraph(f"Дата: {today}")
+            doc.add_paragraph("В Управление Федеральной антимонопольной службы")
+            doc.add_paragraph("От: ООО «СТРОЙСТАНДАРТ»")
+            doc.add_paragraph("_" * 50)
+            doc.add_heading('Обоснование', level=1)
+            doc.add_paragraph(content[:500] if len(content) > 500 else content)
+            if analysis.get('recommendations'):
+                doc.add_heading('Правовая позиция', level=1)
+                for rec in analysis['recommendations']:
+                    doc.add_paragraph(f"• {rec}", style='List Bullet')
+        elif doc_type == "material_change":
+            header = doc.add_heading('ПИСЬМО О ЗАМЕНЕ МАТЕРИАЛА', 0)
+            header.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            doc.add_paragraph(f"Дата: {today}")
+            doc.add_paragraph("Генеральному директору Заказчика")
+            doc.add_paragraph("От: ООО «СТРОЙСТАНДАРТ»")
+            doc.add_paragraph("_" * 50)
+            doc.add_heading('О согласовании замены', level=1)
+            doc.add_paragraph(content[:500] if len(content) > 500 else content)
+            doc.add_paragraph("Просим согласовать замену в связи с прекращением производства.")
+        else:
+            header = doc.add_heading('ЮРИДИЧЕСКИЙ ДОКУМЕНТ', 0)
+            header.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            doc.add_paragraph(f"Дата: {today}")
+            doc.add_paragraph(content[:500] if len(content) > 500 else content)
         
-        # Основной текст
-        doc.add_heading('Описание ситуации', level=1)
-        doc.add_paragraph(complaint_text[:500] + "...")  # Краткое изложение
-        
-        doc.add_heading('Правовая позиция', level=1)
-        doc.add_paragraph(
-            "На основании проведенного анализа выявлены следующие нарушения:\n"
-            f"- Уровень риска: {risk_analysis.get('level', 'MEDIUM')}\n"
-            f"- Оценка соответствия ФЗ-44: {risk_analysis.get('regulatory_score', 7)}/10\n"
-            f"- Финансовые риски: {risk_analysis.get('financial_score', 5)}/10"
-        )
-        
-        # Прецеденты
-        if precedents:
-            doc.add_heading('Судебная практика', level=1)
-            for prec in precedents[:2]:
-                doc.add_paragraph(f"• {prec.get('id', 'N/A')}: {prec.get('summary', 'N/A')}")
-        
-        # Требования
-        doc.add_heading('Требования', level=1)
-        doc.add_paragraph(
-            "На основании изложенного, просим:\n"
-            "1. Признать действия Заказчика нарушающими ФЗ-44 и ФЗ-135\n"
-            "2. Выдать предписание об устранении нарушений\n"
-            "3. Признать аукцион несостоявшимся в части спорных требований"
-        )
-        
-        # Приложение
-        doc.add_paragraph("\nПриложения:\n1. Расчет несоразмерности требований\n2. Выписки из реестра контрактов\n3. Копии прецедентов")
-        
-        filename = f"{self.output_dir}/fas_addendum_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+        filename = f"{self.output_dir}/doc_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
         doc.save(filename)
         return filename
     
