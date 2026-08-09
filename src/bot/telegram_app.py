@@ -32,6 +32,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = None
     
+    # Игнорируем команду /start и другие команды
+    if update.message.text and update.message.text.startswith('/'):
+        return
+    
     # Проверяем, есть ли документ
     if update.message.document:
         document = await update.message.document.get_file()
@@ -61,6 +65,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         analysis = result['analysis']
         
+        # Формируем текстовый отчет
         response_text = f"""
 📊 {result['message']}
 
@@ -74,25 +79,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 3️⃣ ФИНАНСОВЫЕ РИСКИ: {"⚠️ Выявлены" if analysis['financial_exposure'] else "✅ Не выявлены"}
 
-4️⃣ ПРОЕКТ ДОКУМЕНТА:
-Сгенерирован автоматически (см. прикрепленный файл .docx)
-
 ---
+💡 Для создания файла .docx напишите: "создай файл", "сделай документ", "подготовь письмо"
 💡 Ваша правка будет учтена, если напишете: "исправь...", "добавь...", "измени..."
         """.strip()
         
         await update.message.reply_text(response_text)
         
-        docx_content = orchestrator.generate_docx(analysis)
-        doc_file = BytesIO(docx_content)
-        doc_file.name = f"legal_report_{analysis['risk_level']}_{analysis['risk_score']}.docx"
-        
-        await update.message.reply_document(
-            document=InputFile(doc_file),
-            caption=f"📄 Полный юридический отчет (Риск: {analysis['risk_score']}/10)"
-        )
-        
-        logger.info(f"Отчет отправлен пользователю {user_id}")
+        # Генерируем файл .docx только по явному запросу
+        if any(keyword in text.lower() for keyword in ['создай файл', 'сделай документ', 'подготовь письмо', 'сохрани как', 'экспортируй']):
+            docx_content = orchestrator.generate_docx(analysis)
+            doc_file = BytesIO(docx_content)
+            doc_file.name = f"legal_report_{analysis['risk_level']}_{analysis['risk_score']}.docx"
+            
+            await update.message.reply_document(
+                document=InputFile(doc_file),
+                caption=f"📄 Полный юридический отчет (Риск: {analysis['risk_score']}/10)"
+            )
+            logger.info(f"Файл .docx отправлен пользователю {user_id}")
+        else:
+            logger.info(f"Текстовый отчет отправлен пользователю {user_id}")
         
     except Exception as e:
         logger.error(f"Ошибка обработки: {e}", exc_info=True)
