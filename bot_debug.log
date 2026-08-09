@@ -89,3 +89,93 @@
 2026-08-08 21:51:35,908 - __main__ - WARNING - НЕ УДАЛОСЬ найти путь к Telegram. Бот будет пробовать снова через 10 сек...
 2026-08-08 21:51:45,919 - __main__ - INFO - Начинаю поиск рабочего пути к Telegram (всего вариантов: 28)...
 2026-08-08 21:51:45,919 - __main__ - WARNING - НЕ УДАЛОСЬ найти путь к Telegram. Бот будет пробовать снова через 10 сек...
+2026-08-09 09:49:38,610 - src.bot.telegram_app - ERROR - TELEGRAM_BOT_TOKEN не найден в переменных окружения!
+2026-08-09 09:49:41,495 - src.bot.telegram_app - WARNING - DEEPSEEK_API_KEY не найден, бот будет работать без AI
+2026-08-09 09:50:00,148 - src.bot.telegram_app - WARNING - DEEPSEEK_API_KEY не найден, бот будет работать без AI
+2026-08-09 09:50:00,148 - src.bot.telegram_app - INFO - Starting Telegram Bot (CEO Assistant Mode)...
+2026-08-09 09:50:00,968 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bottest_token/getMe "HTTP/1.1 404 Not Found"
+2026-08-09 09:50:00,969 - telegram.ext - ERROR - Network Retry Loop (Bootstrap Initialize Application): Invalid token. Aborting retry loop.
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 865, in initialize
+    await self.get_me()
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 2040, in get_me
+    return await super().get_me(
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 1005, in get_me
+    result = await self._post(
+             ^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 712, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 378, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 741, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 198, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 375, in _request_wrapper
+    raise exception
+telegram.error.InvalidToken: Not Found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_utils/networkloop.py", line 161, in network_retry_loop
+    await do_action()
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_utils/networkloop.py", line 136, in do_action
+    await action_cb()
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_application.py", line 489, in initialize
+    await self.bot.initialize()
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 324, in initialize
+    await super().initialize()
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 868, in initialize
+    raise InvalidToken(f"The token `{self._token}` was rejected by the server.") from exc
+telegram.error.InvalidToken: The token `test_token` was rejected by the server.
+2026-08-09 09:51:06,072 - src.bot.telegram_app - ERROR - TELEGRAM_BOT_TOKEN не найден в переменных окружения!
+2026-08-09 09:51:09,595 - src.bot.telegram_app - WARNING - DEEPSEEK_API_KEY не найден, бот будет работать без AI
+2026-08-09 09:51:27,196 - src.bot.telegram_app - WARNING - DEEPSEEK_API_KEY не найден, бот будет работать без AI
+2026-08-09 09:51:27,207 - src.bot.telegram_app - INFO - Starting Telegram Bot (CEO Assistant Mode)...
+2026-08-09 09:51:27,954 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bottest_token/getMe "HTTP/1.1 404 Not Found"
+2026-08-09 09:51:27,954 - telegram.ext - ERROR - Network Retry Loop (Bootstrap Initialize Application): Invalid token. Aborting retry loop.
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 865, in initialize
+    await self.get_me()
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 2040, in get_me
+    return await super().get_me(
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 1005, in get_me
+    result = await self._post(
+             ^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 712, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 378, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 741, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 198, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 375, in _request_wrapper
+    raise exception
+telegram.error.InvalidToken: Not Found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_utils/networkloop.py", line 161, in network_retry_loop
+    await do_action()
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_utils/networkloop.py", line 136, in do_action
+    await action_cb()
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_application.py", line 489, in initialize
+    await self.bot.initialize()
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 324, in initialize
+    await super().initialize()
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 868, in initialize
+    raise InvalidToken(f"The token `{self._token}` was rejected by the server.") from exc
+telegram.error.InvalidToken: The token `test_token` was rejected by the server.

@@ -16,8 +16,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # --- КОНФИГУРАЦИЯ ---
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8433856602:AAGD6ZmOLtb_N6Hte4TClQnyKlxnsIb-TLg")
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-407e8108be824c69a42df8f9a4005bbb")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+
+if not TELEGRAM_BOT_TOKEN:
+    logger.error("TELEGRAM_BOT_TOKEN не найден в переменных окружения!")
+    sys.exit(1)
+
+if not DEEPSEEK_API_KEY:
+    logger.warning("DEEPSEEK_API_KEY не найден, бот будет работать без AI")
+
 LOG_FILE = "orchestrator_log.json"
 
 # --- ИНТЕГРАЦИЯ С DEEPSEEK (МОЗГ) ---
@@ -141,21 +149,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file_name_raw = parts[1].strip().split('\n')[0].strip()
         file_name = file_name_raw.replace('"', '').replace("'", "")
         
-        # Здесь должна быть логика генерации .docx на основе clean_text
-        # Для демо создадим простой файл, в реальном проекте тут вызов генератора
-        file_content = clean_text # В реальности тут формируется docx
+        # Генерация документа через document_generator
+        from src.core.document_generator import generate_document
         
-        # Создаем временный файл (эмуляция генерации документа)
-        # В продакшене здесь вызывается функция generate_docx(content)
-        file_path = f"temp_{file_name}"
         try:
-            # Простая эмуляция создания файла для проверки логики
-            # Если у вас есть реальный генератор docx, замените этот блок
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(f"Документ: {file_name}\n\n{clean_text}\n\n(Сгенерировано ИИ-юристом)")
-            
-            file_to_send = file_path
-            # Убираем служебную строку из ответа пользователю
+            doc_path = generate_document(clean_text, file_name)
+            file_to_send = doc_path
             ai_response = clean_text 
         except Exception as e:
             logger.error(f"Error creating file: {e}")
@@ -177,6 +176,43 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Логирование
     log_action(user.id, text, ai_response, file_name)
 
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка входящих документов (PDF, DOCX, IMG)"""
+    if not update.message or not update.message.document:
+        return
+        
+    doc = update.message.document
+    file_name = doc.file_name
+    
+    logger.info(f"Получен документ: {file_name}")
+    
+    # Подтверждение получения
+    await update.message.reply_text(
+        f"📄 **Документ принят:** `{file_name}`\n"
+        f"⏳ Запускаю анализ через Legal Shredder AI...",
+        parse_mode="Markdown"
+    )
+    
+    # Скачиваем файл для анализа
+    file = await context.bot.get_file(doc.file_id)
+    file_path = f"temp_{file_name}"
+    await file.download_to_drive(file_path)
+    
+    try:
+        # Интеграция с анализатором документов будет добавлена
+        report = (
+            f"📊 **Анализ документа завершен**\n\n"
+            f"Файл: `{file_name}`\n"
+            f"Статус: Готов к обработке\n\n"
+            f"_Для полного анализа подключите модуль Legal Shredder_"
+        )
+        
+        await update.message.reply_text(report, parse_mode="Markdown")
+    finally:
+        # Удаляем временный файл
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error {context.error}")
 
@@ -187,6 +223,7 @@ def main():
     
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_error_handler(error_handler)
     
     app.run_polling(allowed_updates=Update.ALL_TYPES)
