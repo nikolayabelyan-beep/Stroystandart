@@ -179,3 +179,4 @@ Traceback (most recent call last):
   File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 868, in initialize
     raise InvalidToken(f"The token `{self._token}` was rejected by the server.") from exc
 telegram.error.InvalidToken: The token `test_token` was rejected by the server.
+2026-08-09 09:57:23,466 - src.bot.telegram_app - ERROR - TELEGRAM_BOT_TOKEN не найден в переменных окружения!
