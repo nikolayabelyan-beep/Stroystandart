@@ -24,7 +24,8 @@ if not TELEGRAM_BOT_TOKEN:
     sys.exit(1)
 
 if not DEEPSEEK_API_KEY:
-    logger.warning("DEEPSEEK_API_KEY не найден, бот будет работать без AI")
+    logger.error("DEEPSEEK_API_KEY не найден! Бот не сможет работать без ключа.")
+    sys.exit(1) # Теперь бот не запустится без ключа
 
 LOG_FILE = "orchestrator_log.json"
 
@@ -59,16 +60,20 @@ async def ask_deepseek(prompt: str, user_history: list = None) -> str:
 
     try:
         async with aiohttp.ClientSession() as session:
+            logger.info(f"Отправка запроса к DeepSeek API: {prompt[:50]}...") # Лог отправки
             async with session.post(url, json={"model": "deepseek-chat", "messages": messages}, headers=headers) as resp:
+                logger.info(f"Получен ответ от DeepSeek со статусом: {resp.status}") # Лог ответа
                 if resp.status == 200:
                     data = await resp.json()
-                    return data["choices"][0]["message"]["content"]
+                    response_text = data["choices"][0]["message"]["content"]
+                    logger.info(f"Ответ DeepSeek: {response_text[:100]}...") # Лог содержимого
+                    return response_text
                 else:
                     error_text = await resp.text()
                     logger.error(f"DeepSeek API Error: {resp.status} - {error_text}")
-                    return "Ошибка связи с сервером аналитики. Попробуйте позже."
+                    return f"Ошибка связи с сервером аналитики (код {resp.status}). Попробуйте позже."
     except Exception as e:
-        logger.error(f"Connection error to DeepSeek: {e}")
+        logger.error(f"Connection error to DeepSeek: {e}", exc_info=True) # Полный лог ошибки
         return "Техническая ошибка соединения."
 
 # --- ЛОГИРОВАНИЕ ДЕЙСТВИЙ ОРКЕСТРАТОРА ---
