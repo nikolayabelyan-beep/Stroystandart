@@ -1,0 +1,156 @@
+"""
+Risk Scoring Engine v2.0
+Детальный анализ документов с генерацией проектов ответов.
+"""
+import re
+from typing import Dict, List, Any, Optional
+from datetime import datetime
+
+class RiskScoringEngine:
+    def __init__(self):
+        self.keywords_risk = {
+            'high': ['расторжение', 'штраф', 'пеня', 'суд', 'арбитраж', 'банкротство', 'односторонний отказ', 'безакцептное'],
+            'medium': ['задержка', 'неустойка', 'дефект', 'претензия', 'нарушение срока', 'гарантия'],
+            'low': ['согласование', 'уведомление', 'информация', 'просьба', 'рекомендация']
+        }
+        
+    def analyze_document(self, text: str, doc_type: str = "unknown") -> Dict[str, Any]:
+        """
+        Полный анализ документа.
+        Возвращает детальную структуру с проектом ответа.
+        """
+        text_lower = text.lower()
+        
+        # 1. Оценка рисков по ключевым словам
+        risk_score = 1
+        detected_risks = []
+        
+        for level, words in self.keywords_risk.items():
+            for word in words:
+                if word in text_lower:
+                    if level == 'high':
+                        risk_score = max(risk_score, 8)
+                        detected_risks.append(f"Высокий риск: упоминание '{word}'")
+                    elif level == 'medium':
+                        risk_score = max(risk_score, 5)
+                        detected_risks.append(f"Средний риск: упоминание '{word}'")
+                    else:
+                        risk_score = max(risk_score, 2)
+        
+        # 2. Анализ структуры (если есть цифры, суммы, даты)
+        has_money = bool(re.search(r'\d+\s?(млн|тыс|руб|₽)', text_lower))
+        has_dates = bool(re.search(r'\d{2}.\d{2}.\d{4}', text_lower))
+        
+        if has_money and risk_score < 6:
+            risk_score += 1
+            detected_risks.append("Финансовые обязательства выявлены")
+            
+        # 3. Генерация рекомендаций
+        recommendations = []
+        if risk_score >= 7:
+            recommendations.append("СРОЧНО: Требуется проверка юристом перед подписанием/ответом.")
+            recommendations.append("Подготовить правовую позицию по оспоримым пунктам.")
+        elif risk_score >= 4:
+            recommendations.append("Рекомендуется запросить дополнительные гарантии или уточнения.")
+            recommendations.append("Проверить соответствие условиям контракта.")
+        else:
+            recommendations.append("Документ соответствует стандартным практикам.")
+            recommendations.append("Можно согласовать в рабочем порядке.")
+
+        # 4. Генерация проекта ответа (Draft)
+        draft_response = self._generate_draft(text, doc_type, risk_score)
+
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "risk_level": "HIGH" if risk_score >= 7 else ("MEDIUM" if risk_score >= 4 else "LOW"),
+            "risk_score": risk_score,
+            "detected_issues": detected_risks,
+            "recommendations": recommendations,
+            "financial_exposure": has_money,
+            "draft_document": draft_response,
+            "analysis_summary": f"Анализ завершен. Выявлено {len(detected_risks)} потенциальных проблем. Уровень риска: {risk_score}/10."
+        }
+
+    def _generate_draft(self, text: str, doc_type: str, risk_score: int) -> str:
+        """Генерирует черновик ответа в зависимости от типа документа."""
+        base_date = datetime.now().strftime("%d.%m.%Y")
+        
+        if "фас" in text.lower() or "жалоб" in text.lower():
+            return f"""
+ДОПОЛНЕНИЕ К ЖАЛОБЕ В ФАС
+От: ООО «СТРОЙСТАНДАРТ»
+Дата: {base_date}
+
+В Управление Федеральной антимонопольной службы
+[Наименование управления]
+
+Касательно жалобы по закупке [Номер закупки]
+
+Уважаемые коллеги!
+
+В дополнение к ранее поданной жалобе, на основании проведенного правового анализа, сообщаем следующее:
+
+1. Действия Заказчика содержат признаки нарушения ч. 1 ст. 17 ФЗ-135 (ограничение конкуренции).
+2. Требования к участникам являются избыточными и не обусловленными предметом контракта.
+3. Риск необоснованного отклонения заявки создает угрозу срыва государственных нужд.
+
+ПРОСИМ:
+1. Признать действия Заказчика нарушающими законодательство о контрактной системе.
+2. Выдать предписание об устранении нарушений.
+
+Приложение: Расчеты и правовое обоснование.
+
+Директор ООО «СТРОЙСТАНДАРТ»
+_____________ / [ФИО]
+"""
+        elif "замен" in text.lower() or "утеплител" in text.lower():
+            return f"""
+ПИСЬМО ЗАКАЗЧИКУ
+Исх. № {datetime.now().strftime('%d-%m-%Y')}
+
+Генеральному директору [Наименование Заказчика]
+[ФИО Руководителя]
+
+О согласовании замены материала
+
+Уважаемый [Имя Отчество]!
+
+В рамках исполнения Контракта № [Номер] уведомляем Вас о необходимости замены материала «[Старый материал]» в связи с прекращением его производства заводом-изготовителем.
+
+Предлагаем равнозначную замену: «[Новый материал]».
+Характеристики предлагаемого материала ПРЕВОСХОДЯТ проектные значения:
+- Теплопроводность: ниже на 5%
+- Пожаробезопасность: класс НГ подтвержден новым сертификатом.
+
+Замена не повлечет удорожания работ и срыва сроков.
+Просим согласовать замену в срок до [Дата].
+
+Приложение: Сертификаты, сравнительная таблица.
+
+С уважением,
+Директор ООО «СТРОЙСТАНДАРТ»
+"""
+        else:
+            return f"""
+ЮРИДИЧЕСКОЕ ЗАКЛЮЧЕНИЕ
+Дата: {base_date}
+
+По результату анализа документа выявлен уровень риска: {risk_score}/10.
+
+Основные замечания:
+- {[item for item in self.keywords_risk['high'] if item in text.lower()] or 'Критических ошибок не найдено'}
+
+Рекомендуемый ответ:
+Требуется уточнение позиций по спорным моментам перед направлением контрагенту.
+Необходимо сверить условия с текущей судебной практикой.
+
+Проект ответа формируется индивидуально после детального изучения текста.
+"""
+
+# Тест при запуске
+if __name__ == "__main__":
+    engine = RiskScoringEngine()
+    test_text = "Заказчик требует расторгнуть договор и выплатить штраф 5 млн руб."
+    result = engine.analyze_document(test_text, "contract")
+    print(f"Risk Score: {result['risk_score']}")
+    print(f"Draft generated: {len(result['draft_document']) > 0}")

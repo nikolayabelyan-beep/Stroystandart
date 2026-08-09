@@ -1,0 +1,29 @@
+{
+  "risk_id": "RISK-20260808203250",
+  "document_id": "DOC-2024-001",
+  "risk_score": 4,
+  "risk_level": "MEDIUM",
+  "assessment_date": "2026-08-08T20:32:50.479488",
+  "criteria_scores": {
+    "contractual_obligations": 8,
+    "regulatory_compliance": 2,
+    "financial_exposure": 4,
+    "timeline_violations": 5,
+    "precedent_similarity": 2
+  },
+  "critical_issues": [
+    "КРИТИЧНО: Серьезные проблемы с договорными обязательствами"
+  ],
+  "recommendations": [
+    "Консультация с Compliance Checker",
+    "Запрос дополнительных документов",
+    "Пересмотр спорных условий"
+  ],
+  "escalation_required": true,
+  "assigned_agent": "LEGAL_SHREDDER_AI",
+  "precedent_matches": [
+    "PREC-2023-001: Нарушение сроков строительства",
+    "PREC-2023-015: Споры по качеству работ",
+    "PREC-2022-042: Невыполнение платежных обязательств"
+  ]
+}
