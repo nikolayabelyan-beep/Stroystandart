@@ -24,7 +24,8 @@ if not TELEGRAM_BOT_TOKEN:
     sys.exit(1)
 
 if not DEEPSEEK_API_KEY:
-    logger.warning("DEEPSEEK_API_KEY не найден, бот будет работать без AI")
+    logger.error("DEEPSEEK_API_KEY не найден! Бот не сможет работать без ключа.")
+    sys.exit(1) # Теперь бот не запустится без ключа
 
 LOG_FILE = "orchestrator_log.json"
 
@@ -59,16 +60,20 @@ async def ask_deepseek(prompt: str, user_history: list = None) -> str:
 
     try:
         async with aiohttp.ClientSession() as session:
+            logger.info(f"Отправка запроса к DeepSeek API: {prompt[:50]}...") # Лог отправки
             async with session.post(url, json={"model": "deepseek-chat", "messages": messages}, headers=headers) as resp:
+                logger.info(f"Получен ответ от DeepSeek со статусом: {resp.status}") # Лог ответа
                 if resp.status == 200:
                     data = await resp.json()
-                    return data["choices"][0]["message"]["content"]
+                    response_text = data["choices"][0]["message"]["content"]
+                    logger.info(f"Ответ DeepSeek: {response_text[:100]}...") # Лог содержимого
+                    return response_text
                 else:
                     error_text = await resp.text()
                     logger.error(f"DeepSeek API Error: {resp.status} - {error_text}")
-                    return "Ошибка связи с сервером аналитики. Попробуйте позже."
+                    return f"Ошибка связи с сервером аналитики (код {resp.status}). Попробуйте позже."
     except Exception as e:
-        logger.error(f"Connection error to DeepSeek: {e}")
+        logger.error(f"Connection error to DeepSeek: {e}", exc_info=True) # Полный лог ошибки
         return "Техническая ошибка соединения."
 
 # --- ЛОГИРОВАНИЕ ДЕЙСТВИЙ ОРКЕСТРАТОРА ---
@@ -201,17 +206,23 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await file.download_to_drive(file_path)
     
     try:
-        # TODO: Интеграция с модулем анализа документов (OCR + AI)
-        # Сейчас бот принимает файл, но для глубокого анализа нужен модуль extraction
+        # Отправляем документ в DeepSeek для анализа
+        with open(file_path, 'rb') as f:
+            file_content = f.read()
+        
+        # Формируем запрос к AI с контекстом файла
+        ai_prompt = f"Проанализируй этот документ: {file_name}\n\nСодержание:\n{file_content.decode('utf-8', errors='ignore')[:5000]}"
+        
+        await update.message.chat.send_action(action='typing')
+        ai_response = await ask_deepseek(ai_prompt, [])
         
         report = (
             f"✅ **Файл загружен:** `{file_name}`\n\n"
-            f"⚠️ _Модуль глубокого анализа (Legal Shredder) находится в подключении._\n"
-            f"Я сохранил файл. Чтобы я проанализировал его содержание, пожалуйста, напишите текстом:\n"
-            f"_'Проанализируй этот документ' или задайте конкретный вопрос по нему._"
+            f"📊 **Анализ документа:**\n{ai_response}"
         )
         
         await update.message.reply_text(report, parse_mode="Markdown")
+
     finally:
         # Удаляем временный файл
         if os.path.exists(file_path):

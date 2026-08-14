@@ -1,47 +1,24 @@
 ```
-# Logs
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs and temp files
 *.log
+*.tmp
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Dependencies
-node_modules/
-.venv/
-venv/
-__pycache__/
-*.pyc
-
-# Build artifacts
-dist/
-build/
-target/
-
 # Editors
 .vscode/
 .idea/
 
-# System
-.DS_Store
-Thumbs.db
-
-# Temp files
-*.tmp
-*.swp
-
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# Gradle
-.gradle/
-
-# MyPy
-.mypy_cache/
-
-# Pytest
-.pytest_cache/
+# Dependencies
+.venv/
+venv/
 ```
