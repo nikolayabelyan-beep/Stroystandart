@@ -315,45 +315,4 @@ class NotificationService:
         return await self.send_notification(notification)
 
 
-# Пример использования
-if __name__ == "__main__":
-    service = NotificationService()
-    
-    # Тестовая Risk Card
-    test_risk_card = {
-        'risk_id': 'RISK-20240115143022',
-        'document_id': 'DOC-2024-001',
-        'risk_score': 8,
-        'risk_level': 'HIGH',
-        'assessment_date': '2024-01-15T14:30:22',
-        'critical_issues': [
-            'КРИТИЧНО: Отсутствие допуска СРО',
-            'КРИТИЧНО: Высокие финансовые риски'
-        ],
-        'recommendations': [
-            'Немедленная эскалация директору',
-            'Требуется внешняя юридическая экспертиза'
-        ],
-        'precedent_matches': [
-            'PREC-2023-001: Нарушение сроков строительства',
-            'PREC-2022-042: Невыполнение платежных обязательств'
-        ]
-    }
-    
-    # Тестовые задачи для отчета
-    completed_tasks = [
-        {'task_name': 'Оценка риска DOC-2024-001', 'success': True, 'details': 'Risk Score: 8/10'},
-        {'task_name': 'Поиск прецедентов', 'success': True, 'details': 'Найдено 3 прецедента'},
-        {'task_name': 'Генерация Risk Card', 'success': True, 'details': 'Экспорт в JSON выполнен'}
-    ]
-    
-    planned_tasks = [
-        {'task_name': 'Обработка входящих документов', 'priority': 'HIGH', 'assigned_agent': 'LEGAL_SHREDDER_AI'},
-        {'task_name': 'Еженедельный аудит базы прецедентов', 'priority': 'MEDIUM', 'assigned_agent': 'COMPLIANCE_CHECKER'},
-        {'task_name': 'Генерация еженедельного отчета', 'priority': 'LOW', 'assigned_agent': 'DOCUMENT_PROCESSING_AGENT'}
-    ]
-    
-    print("Тест Notification Service запущен...")
-    print("\nДля реальной отправки в Telegram необходимо настроить:")
-    print("1. BOT_TOKEN в agents_config.yaml")
-    print("2. CHAT_ID в agents_config.yaml")
+# Пример использования удален для чистоты кода

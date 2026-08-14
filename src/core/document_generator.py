@@ -156,3 +156,36 @@ class DocumentGenerator:
 
 # Singleton instance
 generator = DocumentGenerator()
+
+def generate_document(content: str, filename: str) -> str:
+    """Универсальная функция генерации документа на основе контента"""
+    import re
+    
+    # Определяем тип документа по ключевым словам
+    content_lower = content.lower()
+    
+    if any(word in content_lower for word in ['фас', 'жалоба', 'антимонопольная', 'закупк']):
+        return generator.create_fas_addendum(content, {"level": "MEDIUM"}, [])
+    elif any(word in content_lower for word in ['письмо', 'клиент', 'заказчик', 'материал', 'замена']):
+        # Извлекаем данные из контекста (упрощенно)
+        return generator.create_client_letter(
+            client_name="Клиент",
+            contract_num="№ б/н",
+            old_material="Стандартный",
+            new_material="Аналог",
+            characteristics={}
+        )
+    elif any(word in content_lower for word in ['риск', 'отчет', 'анализ']):
+        return generator.create_risk_report("Анализ", 5, {"details": content[:200]})
+    else:
+        # Документ общего назначения
+        doc = Document()
+        doc.add_heading('ДОКУМЕНТ', 0)
+        doc.add_paragraph(content)
+        doc.add_paragraph("\n_Сгенерировано ИИ-ассистентом ООО 'СТРОЙСТАНДАРТ'_")
+        
+        filepath = f"{generator.output_dir}/{filename}"
+        if not filepath.endswith('.docx'):
+            filepath += '.docx'
+        doc.save(filepath)
+        return filepath

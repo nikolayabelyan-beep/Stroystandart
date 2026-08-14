@@ -16,8 +16,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # --- КОНФИГУРАЦИЯ ---
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8433856602:AAGD6ZmOLtb_N6Hte4TClQnyKlxnsIb-TLg")
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-407e8108be824c69a42df8f9a4005bbb")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+
+if not TELEGRAM_BOT_TOKEN:
+    logger.error("TELEGRAM_BOT_TOKEN не найден в переменных окружения!")
+    sys.exit(1)
+
+if not DEEPSEEK_API_KEY:
+    logger.error("DEEPSEEK_API_KEY не найден! Бот не сможет работать без ключа.")
+    sys.exit(1) # Теперь бот не запустится без ключа
+
 LOG_FILE = "orchestrator_log.json"
 
 # --- ИНТЕГРАЦИЯ С DEEPSEEK (МОЗГ) ---
@@ -35,11 +44,13 @@ async def ask_deepseek(prompt: str, user_history: list = None) -> str:
         "Ты — ИИ-ассистент Генерального директора строительной компании ООО 'СТРОЙСТАНДАРТ'. "
         "Твой стиль: деловой, лаконичный, конкретный, без воды. "
         "Ты отвечаешь на вопросы, анализируешь риски и составляешь документы. "
-        "ПРАВИЛА:\n"
-        "1. Никогда не отправляй шаблонные фразы типа 'Анализ завершен', 'Риск LOW' без реального анализа.\n"
-        "2. Если пользователь просит создать документ (письмо, договор, жалобу), в конце ответа добавь строку: 'FILE_REQUEST: <название файла>.docx'.\n"
-        "3. Если это просто вопрос или приветствие — НЕ создавай файлы.\n"
-        "4. Отвечай сразу по делу."
+        "КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА:\n"
+        "1. ЗАПРЕЩЕНО отправлять шаблонные фразы типа 'Анализ завершен', 'Риск LOW/HIGH', 'ДЕТАЛЬНЫЙ АНАЛИЗ', 'ВЫЯВЛЕННЫЕ ПРОБЛЕМЫ' без реального содержания.\n"
+        "2. Каждый ответ должен быть уникальным и соответствовать конкретному запросу пользователя.\n"
+        "3. Если пользователь просит создать документ (письмо, договор, жалобу), в КОНЦЕ ответа добавь строку: 'FILE_REQUEST: <название файла>.docx'.\n"
+        "4. Если это вопрос, приветствие или обсуждение — НЕ создавай файлы и НЕ пиши шаблоны.\n"
+        "5. Отвечай сразу по делу, без вступлений типа 'Конечно', 'Давайте разберем'.\n"
+        "6. Никогда не пиши структуру отчёта с пунктами 1️⃣2️⃣3️⃣4️⃣ если пользователь явно не просил формат отчёта."
     )
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -49,16 +60,20 @@ async def ask_deepseek(prompt: str, user_history: list = None) -> str:
 
     try:
         async with aiohttp.ClientSession() as session:
+            logger.info(f"Отправка запроса к DeepSeek API: {prompt[:50]}...") # Лог отправки
             async with session.post(url, json={"model": "deepseek-chat", "messages": messages}, headers=headers) as resp:
+                logger.info(f"Получен ответ от DeepSeek со статусом: {resp.status}") # Лог ответа
                 if resp.status == 200:
                     data = await resp.json()
-                    return data["choices"][0]["message"]["content"]
+                    response_text = data["choices"][0]["message"]["content"]
+                    logger.info(f"Ответ DeepSeek: {response_text[:100]}...") # Лог содержимого
+                    return response_text
                 else:
                     error_text = await resp.text()
                     logger.error(f"DeepSeek API Error: {resp.status} - {error_text}")
-                    return "Ошибка связи с сервером аналитики. Попробуйте позже."
+                    return f"Ошибка связи с сервером аналитики (код {resp.status}). Попробуйте позже."
     except Exception as e:
-        logger.error(f"Connection error to DeepSeek: {e}")
+        logger.error(f"Connection error to DeepSeek: {e}", exc_info=True) # Полный лог ошибки
         return "Техническая ошибка соединения."
 
 # --- ЛОГИРОВАНИЕ ДЕЙСТВИЙ ОРКЕСТРАТОРА ---
@@ -141,21 +156,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file_name_raw = parts[1].strip().split('\n')[0].strip()
         file_name = file_name_raw.replace('"', '').replace("'", "")
         
-        # Здесь должна быть логика генерации .docx на основе clean_text
-        # Для демо создадим простой файл, в реальном проекте тут вызов генератора
-        file_content = clean_text # В реальности тут формируется docx
+        # Генерация документа через document_generator
+        from src.core.document_generator import generate_document
         
-        # Создаем временный файл (эмуляция генерации документа)
-        # В продакшене здесь вызывается функция generate_docx(content)
-        file_path = f"temp_{file_name}"
         try:
-            # Простая эмуляция создания файла для проверки логики
-            # Если у вас есть реальный генератор docx, замените этот блок
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(f"Документ: {file_name}\n\n{clean_text}\n\n(Сгенерировано ИИ-юристом)")
-            
-            file_to_send = file_path
-            # Убираем служебную строку из ответа пользователю
+            doc_path = generate_document(clean_text, file_name)
+            file_to_send = doc_path
             ai_response = clean_text 
         except Exception as e:
             logger.error(f"Error creating file: {e}")
@@ -177,6 +183,51 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Логирование
     log_action(user.id, text, ai_response, file_name)
 
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка входящих документов (PDF, DOCX, IMG)"""
+    if not update.message or not update.message.document:
+        return
+        
+    doc = update.message.document
+    file_name = doc.file_name
+    
+    logger.info(f"Получен документ: {file_name}")
+    
+    # Подтверждение получения
+    await update.message.reply_text(
+        f"📄 **Документ принят:** `{file_name}`\n"
+        f"⏳ Запускаю анализ через Legal Shredder AI...",
+        parse_mode="Markdown"
+    )
+    
+    # Скачиваем файл для анализа
+    file = await context.bot.get_file(doc.file_id)
+    file_path = f"temp_{file_name}"
+    await file.download_to_drive(file_path)
+    
+    try:
+        # Отправляем документ в DeepSeek для анализа
+        with open(file_path, 'rb') as f:
+            file_content = f.read()
+        
+        # Формируем запрос к AI с контекстом файла
+        ai_prompt = f"Проанализируй этот документ: {file_name}\n\nСодержание:\n{file_content.decode('utf-8', errors='ignore')[:5000]}"
+        
+        await update.message.chat.send_action(action='typing')
+        ai_response = await ask_deepseek(ai_prompt, [])
+        
+        report = (
+            f"✅ **Файл загружен:** `{file_name}`\n\n"
+            f"📊 **Анализ документа:**\n{ai_response}"
+        )
+        
+        await update.message.reply_text(report, parse_mode="Markdown")
+
+    finally:
+        # Удаляем временный файл
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error {context.error}")
 
@@ -187,6 +238,7 @@ def main():
     
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_error_handler(error_handler)
     
     app.run_polling(allowed_updates=Update.ALL_TYPES)

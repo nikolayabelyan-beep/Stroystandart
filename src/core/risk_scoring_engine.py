@@ -68,7 +68,7 @@ class RiskScoringEngine:
             "recommendations": recommendations,
             "financial_exposure": has_money,
             "draft_document": draft_response,
-            "analysis_summary": f"Анализ завершен. Выявлено {len(detected_risks)} потенциальных проблем. Уровень риска: {risk_score}/10."
+            "analysis_summary": f"Выявлено {len(detected_risks)} потенциальных проблем. Уровень риска: {risk_score}/10."
         }
 
     def _generate_draft(self, text: str, doc_type: str, risk_score: int) -> str:
@@ -147,10 +147,4 @@ _____________ / [ФИО]
 Проект ответа формируется индивидуально после детального изучения текста.
 """
 
-# Тест при запуске
-if __name__ == "__main__":
-    engine = RiskScoringEngine()
-    test_text = "Заказчик требует расторгнуть договор и выплатить штраф 5 млн руб."
-    result = engine.analyze_document(test_text, "contract")
-    print(f"Risk Score: {result['risk_score']}")
-    print(f"Draft generated: {len(result['draft_document']) > 0}")
+# Тест при запуске удален для чистоты кода
