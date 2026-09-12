@@ -1,37 +1,107 @@
-# StroyStandart Autonomous Office
+# Строительная исполнительная документация
 
-Automation stack for office workflows in a construction company:
-- Telegram control center
-- Role-based agents (Director, PTO, Legal QA, Finance)
-- Protocol-driven document flow
-- Legal updates fetcher
-- iOS control app + mobile API
-- Excel accounting workbook as 1C alternative
+Локальное desktop-приложение для Windows на Python для ведения объектов капитального строительства, ВОР, исполнительной документации, актов освидетельствования скрытых работ (АОСР), исполнительных схем, КС-2, КС-3 и сопутствующих документов.
 
-## Quick start
-1. Create env file:
-   - `cp .env.example .env`
-2. Fill keys in `.env`.
-3. Run mobile API:
-   - `python3 src/api/mobile_control_server.py --host 0.0.0.0 --port 8787`
-4. Run Telegram bot:
-   - `python3 -m src.bot.telegram_app`
+## Главный принцип
 
-## Autostart on Mac Boot
-- Install launchd autostart (API + bot):
-  - `./scripts/install_services_launchd.sh`
-- Remove launchd autostart:
-  - `./scripts/uninstall_services_launchd.sh`
-- Note:
-  - Autostart runs from runtime copy: `~/StroyStandartRuntime` (required for macOS permissions).
-  - After any code updates in this repo, run `./scripts/install_services_launchd.sh` again to sync runtime copy.
+Приложение **НЕ зависит от сметы**. Основная единица работы:
 
-## iPhone control
-- iOS app source: `ios/StroyStandartOfficeApp/`
-- API URL in app: `http://<YOUR_MAC_IP>:8787`
+**ОБЪЕКТ → ВОР → РАБОТА → ФАКТИЧЕСКИЙ ОБЪЁМ → ИСПОЛНИТЕЛЬНАЯ ДОКУМЕНТАЦИЯ**
 
-## Important
-- Do not commit `.env` or any production secrets.
-- Legal references must be verified via:
-  - `obsidian_vault/01_Law/LEGAL_REFERENCE_INDEX.md`
-  - `obsidian_vault/01_Law/Updates/LATEST_UPDATES.md`
+## Требования
+
+- Python 3.10+
+- PySide6
+- SQLite3
+- Ollama или llama.cpp для локального ИИ
+
+## Установка
+
+```bash
+pip install -r requirements.txt
+```
+
+## Запуск
+
+```bash
+python app/main.py
+```
+
+## Структура проекта
+
+```
+app/
+├── main.py                 # Точка входа
+├── ui/                     # Интерфейс пользователя
+├── database/
+│   └── models/             # Модели базы данных
+├── vor/                    # Работа с ВОР
+├── ai/                     # Локальный ИИ
+├── rag/                    # Поиск по нормативной базе
+├── documents/
+│   ├── aosr/               # Акты АОСР
+│   ├── schemas/            # Исполнительные схемы
+│   ├── ks2/                # КС-2
+│   └── ks3/                # КС-3
+├── materials/              # Материалы и сертификаты
+├── photos/                 # Фотофиксация
+├── templates/              # Шаблоны документов
+├── normative/              # Нормативная база
+├── export/                 # Экспорт документов
+└── utils/                  # Утилиты
+```
+
+## Архитектура
+
+### Локальный ИИ
+
+Все функции ИИ работают локально через:
+- Ollama
+- llama.cpp
+
+Запрещено использование облачных API.
+
+### База данных
+
+SQLite с следующей структурой:
+- projects
+- organizations
+- persons
+- representatives
+- work_items
+- documents
+- materials
+- schemas
+- photos
+
+### Импорт данных
+
+Поддерживаемые форматы:
+- XLSX, XLS
+- CSV
+- PDF
+- DOCX
+- TXT
+- Буфер обмена
+
+### Генерация документов
+
+- АОСР из шаблонов DOCX
+- Исполнительные схемы (SVG/PDF)
+- КС-2, КС-3
+- Реестры ИД
+
+## Этапы разработки
+
+1. ✅ Архитектура, БД, объект, ВОР, импорт
+2. ⏳ Интеграция Ollama, локальный ИИ
+3. ⏳ RAG, нормативная база
+4. ⏳ Генератор АОСР, шаблоны
+5. ⏳ Редактор исполнительных схем
+6. ⏳ Материалы, сертификаты, фото
+7. ⏳ КС-2, КС-3
+8. ⏳ Проверка комплектности, резервное копирование
+
+## Лицензия
+
+MIT
